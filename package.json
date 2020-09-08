@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^4.17.1",
+    "puppeteer-core": "^5.2.1"
+  },
+  "browserslist": [
+    "defaults"
+  ],
+  "scripts": {
+    "start": "node server.mjs"
+  }
+}

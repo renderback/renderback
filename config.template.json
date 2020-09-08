@@ -1,0 +1,23 @@
+{
+  "cacheResponses": true,
+  "prerender": true,
+  "target": "https://origin-server",
+  "adminAccessKey": "secret-access-key",
+  "pageConfig": {
+    "waitSelector": "title#title",
+    "resetSelectorScript": "document.head.querySelector('title').removeAttribute('id')",
+    "navigateScript": "window.routeTo('${url}')",
+    "logErrors": true,
+    "logConsole": false,
+    "logResponses": false,
+    "logFailedRequests": true,
+    "abortResourceRequests": true,
+    "requestBlacklist": [
+
+    ]
+  },
+  "prerenderPaths": [
+    "/page-1",
+    "/page-2/page-3"
+  ]
+}
