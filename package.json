@@ -1,14 +1,63 @@
 {
-  "private": true,
-  "license": "UNLICENSED",
+  "name": "spa-ssr-proxy",
+  "version": "0.0.4",
+  "description": "Server-side rendering reverse proxy for single-page web-apps",
+  "author": "Iurii Malchenko <i@yurique.com> (https://github.com/yurique)",
+  "license": "MIT",
+  "files": [
+    "dist/"
+  ],
   "dependencies": {
+    "@types/express-http-proxy": "^1.6.1",
+    "@types/mime-types": "^2.1.0",
+    "async": "^3.2.0",
+    "bluebird": "^3.7.2",
+    "errorhandler": "^1.5.1",
+    "evil-dns": "^0.2.0",
     "express": "^4.17.1",
+    "express-http-proxy": "^1.6.2",
+    "greenlock-express": "^4.0.3",
+    "mime-types": "^2.1.27",
     "puppeteer-core": "^5.2.1"
   },
-  "browserslist": [
-    "defaults"
-  ],
+  "devDependencies": {
+    "@types/async": "^3.0.2",
+    "@types/bluebird": "^3.5.27",
+    "@types/concurrently": "^4.1.0",
+    "@types/content-type": "^1.1.3",
+    "@types/errorhandler": "^1.5.0",
+    "@types/express": "^4.17.8",
+    "@types/node": "^14.6.4",
+    "@types/puppeteer-core": "^2.0.0",
+    "@typescript-eslint/eslint-plugin": "^4.1.0",
+    "@typescript-eslint/parser": "^4.1.0",
+    "concurrently": "^5.3.0",
+    "eslint": "^7.8.1",
+    "eslint-config-airbnb-base": "^14.2.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-prettier": "^3.1.4",
+    "eslint-plugin-typescript": "^0.14.0",
+    "nodemon": "^2.0.4",
+    "prettier": "^2.1.1",
+    "puppeteer": "^5.2.1",
+    "ts-node": "^9.0.0",
+    "typescript": "^4.0.2"
+  },
   "scripts": {
-    "start": "node server.mjs"
+    "build": "yarn run build-ts && yarn run lint",
+    "build-ts": "tsc",
+    "debug": "yarn run build && yarn run watch-debug",
+    "lint": "tsc --noEmit && eslint \"**/*.{js,ts}\" --quiet --fix",
+    "serve": "node dist/server.js",
+    "serve-debug": "nodemon --inspect dist/server.js",
+    "start": "yarn run serve",
+    "test": "jest --forceExit --coverage --verbose",
+    "watch": "concurrently -k -p \"[{name}]\" -n \"Sass,TypeScript,Node\" -c \"yellow.bold,cyan.bold,green.bold\" \"yarn run watch-ts\" \"yarn run watch-node\"",
+    "watch-debug": "concurrently -k -p \"[{name}]\" -n \"Sass,TypeScript,Node\" -c \"yellow.bold,cyan.bold,green.bold\" \"yarn run watch-ts\" \"yarn run serve-debug\"",
+    "watch-node": "nodemon dist/server.js",
+    "watch-test": "yarn run test -- --watchAll",
+    "watch-ts": "tsc -w"
   }
 }

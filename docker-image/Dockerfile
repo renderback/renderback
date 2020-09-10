@@ -1,9 +1,6 @@
-FROM node:slim
-WORKDIR /home/node/spa-ssr-proxy
-COPY --chown=node package.json /home/node/spa-ssr-proxy/
-RUN npm install
-COPY --chown=node src/main/javascript/* /home/node/spa-ssr-proxy/
-
+#FROM node:slim
+#WORKDIR /home/node
+#RUN npm install --production spa-ssr-proxy
 FROM node:slim
 
 RUN apt-get update \
@@ -15,9 +12,9 @@ RUN apt-get update \
       --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=0 --chown=node:node /home/node/spa-ssr-proxy /home/node/spa-ssr-proxy
-WORKDIR /home/node/spa-ssr-proxy
+RUN npm install -g --production spa-ssr-proxy
+#COPY --from=0 --chown=node:node /home/node/node_modules /home/node/node_modules
+WORKDIR /home/node
 USER node
-RUN npm install
 EXPOSE 8080
-CMD ["npm", "start"]
+CMD ["node", "/usr/local/lib/node_modules/spa-ssr-proxy/dist/server.js"]
