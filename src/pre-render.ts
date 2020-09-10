@@ -1,12 +1,16 @@
 import createPage from './create-page'
 import renderPage from './render-page'
 import cache from './cache'
-import config from './config'
+import config, { PageConfig, PreRenderConfig } from './config'
 import createBrowser from './create-browser'
 
-const preRender = async (): Promise<void> => {
-  const { prerenderPaths, pageConfig } = config
-  const target = `http://express-http.local:${config.port}`
+const preRender = async (
+  preRenderConfig: PreRenderConfig,
+  pageConfig: PageConfig,
+  startUrl?: string
+): Promise<void> => {
+  const target = startUrl || `http://express-http.local:${config.port}`
+
   const browser = await createBrowser()
   const page = await createPage(browser, pageConfig)
 
@@ -48,7 +52,7 @@ const preRender = async (): Promise<void> => {
     }
   }
 
-  await processPaths(prerenderPaths)
+  await processPaths(preRenderConfig.paths)
 }
 
 export default preRender

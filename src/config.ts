@@ -2,15 +2,17 @@ import fs from 'fs'
 
 export interface Config {
   browserExecutablePath: string
-  greenlock?: boolean
   port: number
   userAgent: string
   cacheResponses: boolean
-  prerender: boolean
   adminAccessKey: string
   pageConfig: PageConfig
-  prerenderPaths: string[]
   rules: RoutingRule[]
+  preRender?: PreRenderConfig
+}
+
+export interface PreRenderConfig {
+  paths: string[]
 }
 
 export interface PageConfig {
@@ -42,6 +44,14 @@ export interface StaticAssetRoutingRule {
   maxAge?: number // default 31557600000
 }
 
+export interface StaticAssetProxyRoutingRule {
+  rule: 'asset-proxy'
+  ext?: string[]
+  path?: string[]
+  regex?: string[]
+  target: string
+}
+
 export interface PageRoutingRule {
   rule: 'page'
   ext?: string[]
@@ -68,11 +78,26 @@ export interface NotFoundRoutingRule {
 export type RoutingRule =
   | ProxyRoutingRule
   | StaticAssetRoutingRule
+  | StaticAssetProxyRoutingRule
   | PageRoutingRule
   | PageProxyRoutingRule
   | NotFoundRoutingRule
 
+export interface EnvConfig {
+  useGreenlock: boolean
+  greenlockMaintainer?: string
+  shouldPreRender: boolean
+  preRenderStartUrl?: string
+}
+
 const config: Config = JSON.parse(fs.readFileSync('config.json', 'utf8'))
+
+export const envConfig: EnvConfig = {
+  useGreenlock: process.env.GREENLOCK === '1',
+  greenlockMaintainer: process.env.GREENLOCK_MAINTAINER,
+  shouldPreRender: process.env.PRERENDER === '1',
+  preRenderStartUrl: process.env.PRERENDER_START_URL,
+}
 
 console.log('config', JSON.stringify(config, null, 4))
 

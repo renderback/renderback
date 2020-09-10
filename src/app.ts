@@ -5,6 +5,7 @@ import mime from 'mime-types'
 import proxy from 'express-http-proxy'
 import renderUrl from './render-url'
 import config, {
+  envConfig,
   PageProxyRoutingRule,
   PageRoutingRule,
   RoutingRule,
@@ -31,6 +32,7 @@ const pageRoute = async (
   res: Response,
   rule: PageRoutingRule | PageProxyRoutingRule
 ): Promise<Response> => {
+  console.log('page route', req.originalUrl, rule)
   if (req.header('User-Agent') === config.userAgent && rule.rule === 'page') {
     res.status(200).sendFile(`${rule.source}`)
     return res
@@ -66,7 +68,22 @@ app.post('/__ssr/admin/clear-cache', async (req, res) => {
     cache.clear()
     const shouldPreRender = typeof req.query['pre-render'] !== 'undefined'
     if (shouldPreRender) {
-      await preRender()
+      if (!config?.preRender) {
+        return res
+          .status(200)
+          .send(
+            `Cache cleared. Pre-rendering has not been run: preRender configuration is missing.`
+          )
+      }
+      if (envConfig.shouldPreRender) {
+        return res
+          .status(200)
+          .send(
+            `Cache cleared. Pre-rendering has not been run: preRender is disabled.`
+          )
+      }
+
+      await preRender(config.preRender, config.pageConfig)
       return res.status(200).send(`Cache cleared. Pre-rendering has been run.`)
     }
     return res.status(200).send(`Cache cleared.`)
@@ -97,32 +114,37 @@ config.rules.forEach((rule) => {
       app.use(matcher, async (req, resp, next) => {
         req.url = req.originalUrl
         const contentType = mime.lookup(req.url) || 'application/octet-stream'
+        console.log('asset rule matched', req.originalUrl)
 
-        console.log(`checking ${dir}/${req.url}.br`)
-        if (fs.existsSync(`${dir}/${req.url}.br`)) {
-          console.log(
-            `${req.url} -> ${req.url}.br`,
-            `mime.lookup(${req.url}) -> ${contentType}`
-          )
+        console.log('looking for pre-compressed assets')
+        if (fs.existsSync(`${dir}${req.url}.br`)) {
+          console.log(`${req.url} -> ${req.url}.br ${contentType}`)
           req.url = `${req.url}.br`
           resp.set('Content-Encoding', 'br')
           resp.contentType(contentType)
-        } else if (fs.existsSync(`${dir}/${req.url}.gz`)) {
-          console.log(
-            `${req.url} -> ${req.url}.gz`,
-            `mime.lookup(${req.url}) -> ${contentType}`
-          )
+        } else if (fs.existsSync(`${dir}${req.url}.gz`)) {
+          console.log(`${req.url} -> ${req.url}.gz ${contentType}`)
           req.url = `${req.url}.gz`
           resp.set('Content-Encoding', 'gzip')
           resp.contentType(contentType)
         }
 
-        console.log('asset rule matched', req.originalUrl)
-        express.static(dir, {
+        return express.static(dir, {
           maxAge: rule.maxAge || 31557600000,
+          fallthrough: false,
         })(req, resp, next)
       })
 
+      break
+    case 'asset-proxy':
+      // eslint-disable-next-line no-case-declarations
+      console.info('configuring asset-proxy rule', matcher, rule.target)
+      app.use(
+        matcher,
+        proxy(rule.target, {
+          proxyReqPathResolver: (req) => req.originalUrl,
+        })
+      )
       break
 
     case 'page':
@@ -140,5 +162,7 @@ config.rules.forEach((rule) => {
       break
   }
 })
+
+app.use((req, res) => res.status(404).send('Not Found'))
 
 export default app

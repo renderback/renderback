@@ -1,1 +1,6 @@
 node_modules
+docker-image
+.idea
+.vscode
+yarn-error.log
+
