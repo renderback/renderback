@@ -29,8 +29,44 @@ const buildMatcher = (rule: RoutingRule) => {
   return [...paths, ...regexes, ...extensions]
 }
 
+const shortRuleDescription = (rule: RoutingRule): string => {
+  switch (rule.rule) {
+    case 'page':
+      return `${rule.rule} -> ${rule.source}`
+    case 'asset':
+      return `${rule.rule} -> ${rule.dir}`
+    case 'proxy':
+      return `${rule.rule} -> ${rule.target}`
+    case 'asset-proxy':
+      return `${rule.rule} -> ${rule.target}`
+    case 'page-proxy':
+      return `${rule.rule} -> ${rule.target}`
+    case 'not-found':
+      return `${rule.rule}`
+    default:
+      return JSON.stringify(rule)
+  }
+}
+
+const modifyUrl = (modifyScript: string, url: string) => {
+  // eslint-disable-next-line no-eval
+  const modifyFunction = eval(modifyScript)
+  return modifyFunction(url)
+}
+
 const logRule = (url: string, rule: RoutingRule) => {
-  console.log(`rule matched at ${url}`, JSON.stringify(rule))
+  switch (config.log.ruleMatch) {
+    case 0:
+      return
+    case 1:
+      console.log(`${url} -- `, rule.rule)
+      break
+    case 2:
+      console.log(`${url} -- ${shortRuleDescription(rule)}`)
+      break
+    default:
+      console.log(`${url} -- `, JSON.stringify(rule))
+  }
 }
 
 const pageRoute = async (
@@ -39,13 +75,22 @@ const pageRoute = async (
   rule: PageRoutingRule | PageProxyRoutingRule
 ): Promise<Response> => {
   if (req.header('User-Agent') === config.userAgent && rule.rule === 'page') {
+    if (config.log.requestsFromHeadless) {
+      console.log(
+        `request from headless: ${req.originalUrl}, serving ${rule.source}`
+      )
+    }
     res.status(200).sendFile(`${rule.source}`)
     return res
   }
   const { html, etag, ttRenderMs } = await renderUrl(
     rule.rule === 'page-proxy'
-      ? `${rule.target}${req.originalUrl}`
-      : `http://express-http.local:${config.port}${req.originalUrl}`,
+      ? `${rule.target}${
+          rule.modifyUrl
+            ? modifyUrl(rule.modifyUrl, req.originalUrl)
+            : req.originalUrl
+        }`
+      : `http://${envConfig.hostname}:${config.port}${req.originalUrl}`,
     cacheResponses,
     pageConfig
   )
@@ -107,7 +152,10 @@ config.rules.forEach((rule) => {
       app.use(matcher, (req, resp, next) => {
         logRule(req.originalUrl, rule)
         return proxy(rule.target, {
-          proxyReqPathResolver: (request) => request.originalUrl,
+          proxyReqPathResolver: (request) =>
+            rule.modifyUrl
+              ? modifyUrl(rule.modifyUrl, request.originalUrl)
+              : request.originalUrl,
         })(req, resp, next)
       })
       break
@@ -123,16 +171,24 @@ config.rules.forEach((rule) => {
         logRule(req.originalUrl, rule)
         req.url = req.originalUrl
         const contentType = mime.lookup(req.url) || 'application/octet-stream'
-        console.log('asset rule matched', req.originalUrl)
 
-        console.log('looking for pre-compressed assets')
-        if (fs.existsSync(`${dir}${req.url}.br`)) {
-          console.log(`${req.url} -> ${req.url}.br ${contentType}`)
+        if (
+          req.acceptsEncodings().indexOf('br') >= 0 &&
+          fs.existsSync(`${dir}${req.url}.br`)
+        ) {
+          if (config.log.preCompressedAssets) {
+            console.log(`  ${req.url} -> ${req.url}.br (${contentType})`)
+          }
           req.url = `${req.url}.br`
           resp.set('Content-Encoding', 'br')
           resp.contentType(contentType)
-        } else if (fs.existsSync(`${dir}${req.url}.gz`)) {
-          console.log(`${req.url} -> ${req.url}.gz ${contentType}`)
+        } else if (
+          req.acceptsEncodings().indexOf('gzip') >= 0 &&
+          fs.existsSync(`${dir}${req.url}.gz`)
+        ) {
+          if (config.log.preCompressedAssets) {
+            console.log(`  ${req.url} -> ${req.url}.gz (${contentType})`)
+          }
           req.url = `${req.url}.gz`
           resp.set('Content-Encoding', 'gzip')
           resp.contentType(contentType)
@@ -151,7 +207,10 @@ config.rules.forEach((rule) => {
       app.use(matcher, (req, resp, next) => {
         logRule(req.originalUrl, rule)
         return proxy(rule.target, {
-          proxyReqPathResolver: (request) => request.originalUrl,
+          proxyReqPathResolver: (request) =>
+            rule.modifyUrl
+              ? modifyUrl(rule.modifyUrl, request.originalUrl)
+              : request.originalUrl,
         })(req, resp, next)
       })
       break

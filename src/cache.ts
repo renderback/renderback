@@ -29,14 +29,16 @@ export class Cache {
     }
     if (this.enabled) {
       this.cache.set(url, entry)
-      console.info(`Saved to cache.`)
+      if (config.log.cache) {
+        console.info(`saved ${url} to cache.`)
+      }
     }
     return entry
   }
 
   clear(): void {
     this.cache = new Map()
-    console.log('Cache cleared.')
+    console.log('cache cleared.')
   }
 }
 

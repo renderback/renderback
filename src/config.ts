@@ -11,6 +11,7 @@ export interface Config {
   pageConfig: PageConfig
   rules: RoutingRule[]
   preRender?: PreRenderConfig
+  log: LogConfig
 }
 
 export interface PreRenderConfig {
@@ -21,12 +22,20 @@ export interface PageConfig {
   waitSelector: string
   resetSelectorScript: string
   navigateScript: string
-  logErrors: boolean
-  logConsole: boolean
-  logResponses: boolean
-  logFailedRequests: boolean
   abortResourceRequests: boolean
   requestBlacklist: string[]
+}
+
+export interface LogConfig {
+  headless?: boolean
+  requestsFromHeadless?: boolean
+  cache?: boolean
+  ruleMatch?: number // 0 -- disable
+  preCompressedAssets?: boolean
+  pageErrors?: boolean
+  pageConsole?: boolean
+  pageResponses?: boolean
+  pageFailedRequests?: boolean
 }
 
 export interface ProxyRoutingRule {
@@ -35,6 +44,7 @@ export interface ProxyRoutingRule {
   path?: string[]
   regex?: string[]
   target: string
+  modifyUrl?: string
 }
 
 export interface StaticAssetRoutingRule {
@@ -52,6 +62,7 @@ export interface StaticAssetProxyRoutingRule {
   path?: string[]
   regex?: string[]
   target: string
+  modifyUrl?: string
 }
 
 export interface PageRoutingRule {
@@ -68,6 +79,7 @@ export interface PageProxyRoutingRule {
   path?: string[]
   regex?: string[]
   target: string
+  modifyUrl?: string
 }
 
 export interface NotFoundRoutingRule {

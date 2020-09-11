@@ -14,7 +14,10 @@ const preRender = async (
   const browser = await createBrowser()
   const page = await createPage(browser, pageConfig)
 
-  console.log(`Pre-render: navigating to: ${target}/`)
+  if (config.log.headless) {
+    console.log(`pre-render: navigating to: ${target}/`)
+  }
+
   const start = Date.now()
   await page.goto(`${target}/`, { waitUntil: 'networkidle0' })
   const html = await renderPage(page, pageConfig)
@@ -25,7 +28,9 @@ const preRender = async (
   const processPath = async (path: string) => {
     const url = `${target}${path}`
     const pathStart = Date.now()
-    console.log(`Pre-render: navigating to: ${url}`)
+    if (config.log.headless) {
+      console.log(`pre-render: navigating to: ${url}`)
+    }
     await page.evaluate(
       (resetSelectorScript, navigateScript) => {
         // eslint-disable-next-line no-eval

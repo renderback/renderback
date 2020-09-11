@@ -36,7 +36,10 @@ const server = envConfig.useGreenlock
           envConfig.preRenderStartUrl
         )
       }
-      console.log(`Server started at port ${config.port}. Press Ctrl+C to quit`)
+      console.log(
+        `Server started at http://${envConfig.hostname}:${config.port}`
+      )
+      console.log('Press Ctrl+C to quit')
     })
 
 export default server
