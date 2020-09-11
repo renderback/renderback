@@ -10,13 +10,13 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && setcap 'cap_net_bind_service=+ep' /usr/local/bin/node
 
-RUN npm install -g --production spa-ssr-proxy
-
 RUN echo "127.0.0.1 express-http.local" > /etc/hosts
-
 WORKDIR /home/node
-USER node
 EXPOSE 80
 EXPOSE 443
+
+RUN npm install -g --production spa-ssr-proxy@0.0.6
+
+USER node
 CMD ["run.sh"]
 CMD ["node", "/usr/local/lib/node_modules/spa-ssr-proxy/dist/server.js"]

@@ -1,6 +1,6 @@
 {
   "name": "spa-ssr-proxy",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Server-side rendering reverse proxy for single-page web-apps",
   "author": "Iurii Malchenko <i@yurique.com> (https://github.com/yurique)",
   "license": "MIT",

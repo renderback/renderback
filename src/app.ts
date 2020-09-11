@@ -107,7 +107,7 @@ config.rules.forEach((rule) => {
       app.use(matcher, (req, resp, next) => {
         logRule(req.originalUrl, rule)
         return proxy(rule.target, {
-          proxyReqPathResolver: (req) => req.originalUrl,
+          proxyReqPathResolver: (request) => request.originalUrl,
         })(req, resp, next)
       })
       break
@@ -151,7 +151,7 @@ config.rules.forEach((rule) => {
       app.use(matcher, (req, resp, next) => {
         logRule(req.originalUrl, rule)
         return proxy(rule.target, {
-          proxyReqPathResolver: (req) => req.originalUrl,
+          proxyReqPathResolver: (request) => request.originalUrl,
         })(req, resp, next)
       })
       break
