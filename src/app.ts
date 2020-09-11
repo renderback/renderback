@@ -148,7 +148,7 @@ config.rules.forEach((rule) => {
   const matcher = buildMatcher(rule)
   switch (rule.rule) {
     case 'proxy':
-      console.info('configuring proxy rule', matcher, rule.target)
+      console.info(`configuring proxy rule -- ${matcher} -> ${rule.target}`)
       app.use(matcher, (req, resp, next) => {
         logRule(req.originalUrl, rule)
         return proxy(rule.target, {
@@ -165,7 +165,7 @@ config.rules.forEach((rule) => {
       const dir = rule.dir.startsWith('/')
         ? rule.dir
         : path.join(__dirname, rule.dir)
-      console.info('configuring asset rule', matcher, dir)
+      console.info(`configuring asset rule -- ${matcher} -> ${dir}`)
 
       app.use(matcher, async (req, resp, next) => {
         logRule(req.originalUrl, rule)
@@ -203,7 +203,9 @@ config.rules.forEach((rule) => {
       break
     case 'asset-proxy':
       // eslint-disable-next-line no-case-declarations
-      console.info('configuring asset-proxy rule', matcher, rule.target)
+      console.info(
+        `configuring asset-proxy rule -- ${matcher} -> ${rule.target}`
+      )
       app.use(matcher, (req, resp, next) => {
         logRule(req.originalUrl, rule)
         return proxy(rule.target, {
@@ -218,9 +220,9 @@ config.rules.forEach((rule) => {
     case 'page':
     case 'page-proxy':
       console.info(
-        `configuring page rule (${rule.rule})`,
-        matcher,
-        rule.rule === 'page' ? rule.source : rule.target
+        `configuring ${rule.rule} rule -- ${matcher} -> ${
+          rule.rule === 'page' ? rule.source : rule.target
+        }`
       )
       app.use(matcher, async (req, res) => {
         logRule(req.originalUrl, rule)
