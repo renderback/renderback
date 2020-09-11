@@ -1,6 +1,3 @@
-#FROM node:slim
-#WORKDIR /home/node
-#RUN npm install --production spa-ssr-proxy
 FROM node:slim
 
 RUN apt-get update \
@@ -10,11 +7,11 @@ RUN apt-get update \
     && apt-get update \
     && apt-get install -y google-chrome-stable libxss1 libcap2-bin \
       --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-    && setcap 'cap_net_bind_service=+ep' /usr/local/bin/node \
+    && rm -rf /var/lib/apt/lists/* \
+    && setcap 'cap_net_bind_service=+ep' /usr/local/bin/node
 
 RUN npm install -g --production spa-ssr-proxy
-#COPY --from=0 --chown=node:node /home/node/node_modules /home/node/node_modules
+
 WORKDIR /home/node
 USER node
 EXPOSE 80
