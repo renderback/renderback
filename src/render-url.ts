@@ -1,14 +1,14 @@
 import { PageConfig } from './config'
 import createPage from './create-page'
 import renderPage from './render-page'
-import cache from './cache'
+import cache, { CacheEntry } from './cache'
 import createBrowser from './create-browser'
 
 const renderUrl = async (
   url: string,
   cacheResponses: boolean,
   pageConfig: PageConfig
-): Promise<{ html: string; ttRenderMs: number }> => {
+): Promise<CacheEntry & { ttRenderMs?: number }> => {
   const maybeCached = cache.get(url)
   if (maybeCached) {
     return maybeCached
@@ -23,12 +23,8 @@ const renderUrl = async (
   const ttRenderMs = Date.now() - start
   console.info(`Rendered page ${url} in: ${ttRenderMs}ms.`)
 
-  cache.set(url, html)
-  return { html, ttRenderMs }
-}
-
-export const clearCache = (): void => {
-  cache.clear()
+  const entry = cache.set(url, html)
+  return { ttRenderMs, ...entry }
 }
 
 export default renderUrl

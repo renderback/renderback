@@ -17,6 +17,8 @@ const { adminAccessKey, pageConfig, cacheResponses } = config
 
 const app = express()
 
+app.enable('etag')
+
 const buildMatcher = (rule: RoutingRule) => {
   const paths = rule.path ? rule.path : []
   const regexes = rule.regex ? rule.regex.map((p) => new RegExp(p)) : []
@@ -27,28 +29,34 @@ const buildMatcher = (rule: RoutingRule) => {
   return [...paths, ...regexes, ...extensions]
 }
 
+const logRule = (url: string, rule: RoutingRule) => {
+  console.log(`rule matched at ${url}`, JSON.stringify(rule))
+}
+
 const pageRoute = async (
   req: Request,
   res: Response,
   rule: PageRoutingRule | PageProxyRoutingRule
 ): Promise<Response> => {
-  console.log('page route', req.originalUrl, rule)
   if (req.header('User-Agent') === config.userAgent && rule.rule === 'page') {
     res.status(200).sendFile(`${rule.source}`)
     return res
   }
-  const { html, ttRenderMs } = await renderUrl(
+  const { html, etag, ttRenderMs } = await renderUrl(
     rule.rule === 'page-proxy'
       ? `${rule.target}${req.originalUrl}`
       : `http://express-http.local:${config.port}${req.originalUrl}`,
     cacheResponses,
     pageConfig
   )
-  // Add Server-Timing! See https://w3c.github.io/server-timing/.
-  res.set(
-    'Server-Timing',
-    `Prerender;dur=${ttRenderMs};desc="Headless render time (ms)"`
-  )
+  if (ttRenderMs) {
+    // See https://w3c.github.io/server-timing/.
+    res.set(
+      'Server-Timing',
+      `Prerender;dur=${ttRenderMs};desc="Headless render time (ms)"`
+    )
+  }
+  res.set('etag', etag)
   res.status(200).send(html)
   return res
 }
@@ -96,12 +104,12 @@ config.rules.forEach((rule) => {
   switch (rule.rule) {
     case 'proxy':
       console.info('configuring proxy rule', matcher, rule.target)
-      app.use(
-        matcher,
-        proxy(rule.target, {
+      app.use(matcher, (req, resp, next) => {
+        logRule(req.originalUrl, rule)
+        return proxy(rule.target, {
           proxyReqPathResolver: (req) => req.originalUrl,
-        })
-      )
+        })(req, resp, next)
+      })
       break
 
     case 'asset':
@@ -112,6 +120,7 @@ config.rules.forEach((rule) => {
       console.info('configuring asset rule', matcher, dir)
 
       app.use(matcher, async (req, resp, next) => {
+        logRule(req.originalUrl, rule)
         req.url = req.originalUrl
         const contentType = mime.lookup(req.url) || 'application/octet-stream'
         console.log('asset rule matched', req.originalUrl)
@@ -139,12 +148,12 @@ config.rules.forEach((rule) => {
     case 'asset-proxy':
       // eslint-disable-next-line no-case-declarations
       console.info('configuring asset-proxy rule', matcher, rule.target)
-      app.use(
-        matcher,
-        proxy(rule.target, {
+      app.use(matcher, (req, resp, next) => {
+        logRule(req.originalUrl, rule)
+        return proxy(rule.target, {
           proxyReqPathResolver: (req) => req.originalUrl,
-        })
-      )
+        })(req, resp, next)
+      })
       break
 
     case 'page':
@@ -154,7 +163,10 @@ config.rules.forEach((rule) => {
         matcher,
         rule.rule === 'page' ? rule.source : rule.target
       )
-      app.use(matcher, async (req, res) => pageRoute(req, res, rule))
+      app.use(matcher, async (req, res) => {
+        logRule(req.originalUrl, rule)
+        return pageRoute(req, res, rule)
+      })
       break
 
     default:
