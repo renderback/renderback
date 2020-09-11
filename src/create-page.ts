@@ -1,5 +1,5 @@
 import { Browser, Page, Request } from 'puppeteer-core'
-import { PageConfig } from './config'
+import config, { PageConfig } from './config'
 
 const isRequestBlacklisted = (
   request: Request,
@@ -16,7 +16,7 @@ const createPage = async (
 ): Promise<Page> => {
   const page = await browser.newPage()
   await page.setRequestInterception(true)
-  if (pageConfig.logConsole) {
+  if (config.log.pageConsole) {
     page.on('console', async (msg) => {
       if (msg.args().length > 0) {
         console.log(
@@ -26,15 +26,15 @@ const createPage = async (
       }
     })
   }
-  if (pageConfig.logErrors) {
+  if (config.log.pageErrors) {
     page.on('pageerror', ({ message }) => console.log('Page: error:', message))
   }
-  if (pageConfig.logResponses) {
+  if (config.log.pageResponses) {
     page.on('response', (response) => {
       console.log(`Page: response: ${response.status()} ${response.url()}`)
     })
   }
-  if (pageConfig.logFailedRequests) {
+  if (config.log.pageFailedRequests) {
     page.on('requestfailed', (request) => {
       const resourceRequest =
         ['image', 'stylesheet', 'font'].indexOf(request.resourceType()) !== -1
