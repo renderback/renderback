@@ -12,6 +12,7 @@ const createBrowser = async (): Promise<Browser> => {
       `--user-agent=${config.userAgent}`,
       '--no-sandbox',
       '--disable-setuid-sandbox',
+      '--disable-web-security',
     ],
   })
 }
