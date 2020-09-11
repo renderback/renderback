@@ -1,4 +1,6 @@
 import fs from 'fs'
+import os from 'os'
+import yargs, { Argv } from 'yargs'
 
 export interface Config {
   browserExecutablePath: string
@@ -88,17 +90,24 @@ export interface EnvConfig {
   greenlockMaintainer?: string
   shouldPreRender: boolean
   preRenderStartUrl?: string
+  hostname: string
 }
 
-const config: Config = JSON.parse(fs.readFileSync('config.json', 'utf8'))
+const typedYargs: Argv<{ config?: string }> = yargs
+const configFile = typedYargs.argv.config || 'config.json'
+console.log(`args`, yargs.argv)
+console.log(`reading config: ${configFile}`)
+const config: Config = JSON.parse(fs.readFileSync(configFile, 'utf8'))
 
 export const envConfig: EnvConfig = {
   useGreenlock: process.env.GREENLOCK === '1',
   greenlockMaintainer: process.env.GREENLOCK_MAINTAINER,
   shouldPreRender: process.env.PRERENDER === '1',
   preRenderStartUrl: process.env.PRERENDER_START_URL,
+  hostname: os.hostname(),
 }
 
-console.log('config', JSON.stringify(config, null, 4))
+console.log(JSON.stringify(config, null, 4))
+console.log('env config', JSON.stringify(envConfig, null, 4))
 
 export default config

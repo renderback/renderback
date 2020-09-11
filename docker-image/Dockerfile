@@ -10,7 +10,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && setcap 'cap_net_bind_service=+ep' /usr/local/bin/node
 
-RUN echo "127.0.0.1 express-http.local" > /etc/hosts
 WORKDIR /home/node
 EXPOSE 80
 EXPOSE 443
