@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-for tag in $(./docker-get-tag.sh); do
+for tag in $(./docker-get-tag); do
   CMD="docker push ${tag}"
   echo $CMD
   $CMD

@@ -12,6 +12,8 @@ RUN apt-get update \
 
 RUN npm install -g --production spa-ssr-proxy
 
+RUN echo "127.0.0.1 express-http.local" > /etc/hosts
+
 WORKDIR /home/node
 USER node
 EXPOSE 80
