@@ -23,7 +23,12 @@ export interface PreRenderConfig {
 }
 
 export interface StaticGenConfig {
-  output: string
+  contentOutput?: string
+  nginxConfigOutputFile?: string
+  nginxServerName?: string
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  nginxExtraConfig?: any
+  pageCleanUp?: [[string, string]]
 }
 
 export interface PageConfig {
@@ -72,7 +77,6 @@ export interface StaticAssetProxyRoutingRule {
   path?: string[]
   regex?: string[]
   target: string
-  modifyUrl?: string
 }
 
 export interface PageRoutingRule {
@@ -89,7 +93,6 @@ export interface PageProxyRoutingRule {
   path?: string[]
   regex?: string[]
   target: string
-  modifyUrl?: string
 }
 
 export interface NotFoundRoutingRule {
@@ -140,6 +143,7 @@ const defaultConfig: Config = {
     requestBlacklist: [],
   },
   rules: [],
+  static: {},
 }
 
 export const { argv } = yargsRaw
@@ -168,6 +172,11 @@ export const { argv } = yargsRaw
       description: 'Destination file for the static site nginx configuration',
       demandOption: false,
     },
+    'server-name': {
+      type: 'string',
+      description: 'server_name for the static site nginx configuration',
+      demandOption: false,
+    },
   })
   .demandCommand(1, 1)
 
@@ -186,12 +195,8 @@ if (!argv.config) {
       target: origin,
     })
   } else {
-    console.warn(
-      'ORIGIN_BASE_URL environment var is required (i.e. https://my-origin-server.somewhere)'
-    )
-    console.warn(
-      'ORIGIN_BASE_URL environment var is missing, all requests will return 404 Not Found!'
-    )
+    console.warn('ORIGIN_BASE_URL environment var is required (i.e. https://my-origin-server.somewhere)')
+    console.warn('ORIGIN_BASE_URL environment var is missing, all requests will return 404 Not Found!')
   }
 } else {
   console.log(`will read configuration from ${argv.config}`)
@@ -201,41 +206,33 @@ const config: Config = argv.config
   ? _.merge({}, defaultConfig, JSON.parse(fs.readFileSync(argv.config, 'utf8')))
   : defaultConfig
 
-config.browserExecutable =
-  envString('BROWSER_EXECUTABLE') || config.browserExecutable
-config.browserWsEndpoint =
-  envString('BROWSER_WS_ENDPOINT') || config.browserWsEndpoint
+config.browserExecutable = envString('BROWSER_EXECUTABLE') || config.browserExecutable
+config.browserWsEndpoint = envString('BROWSER_WS_ENDPOINT') || config.browserWsEndpoint
 config.userAgent = envString('USER_AGENT') || config.userAgent
 config.port = envNumber('PORT') || config.port
 config.adminAccessKey = envString('ADMIN_ACCESS_KEY') || config.adminAccessKey
 config.enableCache = envBoolean('CACHE') || config.enableCache
 
 config.log.headless = envBoolean('LOG_HEADLESS') || config.log.headless
-config.log.requestsFromHeadless =
-  envBoolean('LOG_REQUESTS_FROM_HEADLESS') || config.log.requestsFromHeadless
+config.log.requestsFromHeadless = envBoolean('LOG_REQUESTS_FROM_HEADLESS') || config.log.requestsFromHeadless
 config.log.cache = envBoolean('LOG_CACHE') || config.log.cache
 config.log.ruleMatch = envNumber('LOG_RULE_MATCH') || config.log.ruleMatch
-config.log.precompressedAssets =
-  envBoolean('LOG_PRECOMPRESSED_ASSETS') || config.log.precompressedAssets
+config.log.precompressedAssets = envBoolean('LOG_PRECOMPRESSED_ASSETS') || config.log.precompressedAssets
 config.log.pageErrors = envBoolean('LOG_PAGE_ERRORS') || config.log.pageErrors
-config.log.pageConsole =
-  envBoolean('LOG_PAGE_CONSOLE') || config.log.pageConsole
-config.log.pageResponses =
-  envBoolean('LOG_PAGE_RESPONSES') || config.log.pageResponses
-config.log.pageFailedRequests =
-  envBoolean('LOG_PAGE_FAILED_REQUESTS') || config.log.pageFailedRequests
+config.log.pageConsole = envBoolean('LOG_PAGE_CONSOLE') || config.log.pageConsole
+config.log.pageResponses = envBoolean('LOG_PAGE_RESPONSES') || config.log.pageResponses
+config.log.pageFailedRequests = envBoolean('LOG_PAGE_FAILED_REQUESTS') || config.log.pageFailedRequests
 
-config.page.waitSelector =
-  envString('PAGE_WAIT_SELECTOR') || config.page.waitSelector
-config.page.resetScript =
-  envString('PAGE_RESET_SCRIPT') || config.page.resetScript
-config.page.navigateScript =
-  envString('PAGE_NAVIGATE_SCRIPT') || config.page.navigateScript
-config.page.abortResourceRequests =
-  envBoolean('PAGE_ABORT_RESOURCE_REQUESTS') ||
-  config.page.abortResourceRequests
-config.page.requestBlacklist =
-  envStringList('PAGE_REQUEST_BLACKLIST') || config.page.requestBlacklist
+config.page.waitSelector = envString('PAGE_WAIT_SELECTOR') || config.page.waitSelector
+config.page.resetScript = envString('PAGE_RESET_SCRIPT') || config.page.resetScript
+config.page.navigateScript = envString('PAGE_NAVIGATE_SCRIPT') || config.page.navigateScript
+config.page.abortResourceRequests = envBoolean('PAGE_ABORT_RESOURCE_REQUESTS') || config.page.abortResourceRequests
+config.page.requestBlacklist = envStringList('PAGE_REQUEST_BLACKLIST') || config.page.requestBlacklist
+
+config.static.contentOutput = envString('STATIC_CONTENT_OUTPUT') || config.static.contentOutput
+config.static.nginxConfigOutputFile =
+  envString('STATIC_NGINX_CONFIG_OUTPUT_FILE') || config.static.nginxConfigOutputFile
+config.static.nginxServerName = envString('STATIC_NGINX_SERVER_NAME') || config.static.nginxServerName
 
 export const envConfig: EnvConfig = {
   greenlockMaintainer: envString('GREENLOCK_MAINTAINER'),

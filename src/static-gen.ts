@@ -1,40 +1,40 @@
 import fs from 'fs'
 import path from 'path'
 import prettyBytes from 'pretty-bytes'
+import { ncp } from 'ncp'
+import { promisify } from 'util'
 import preRender from './pre-render'
-import config, { runtimeConfig } from './config'
-import cache, { CacheEntry } from './cache'
+import config, { ProxyRoutingRule, RoutingRule, runtimeConfig } from './config'
+import cache from './cache'
 import { buildMatcher } from './util'
 
-const { /* static: staticGenConfig, */ preRender: preRenderConfig } = config
+const { static: staticGenConfig, preRender: preRenderConfig } = config
 
-const outputFile = (
-  outputDir: string,
-  urlString: string,
-  entry: CacheEntry,
-  fileNameSuffix?: string
-): void => {
+const getFileName = (outputDir: string, urlString: string, fileNameSuffix?: string): string => {
   const url = new URL(urlString)
-  const { hostname, pathname, searchParams } = url
+  const { pathname, searchParams } = url
   const rawDirName = path.dirname(pathname)
   const dirName = rawDirName.endsWith('/') ? rawDirName : `${rawDirName}/`
   const baseName = path.basename(pathname)
   const fileNameWithoutSearchParams = baseName === '' ? 'index' : baseName
 
   const searchParamsEncoded =
-    searchParams && Buffer.from(searchParams.toString()).toString('base64')
+    searchParams.toString().length > 0 && Buffer.from(searchParams.toString()).toString('base64')
 
   const fileName = searchParamsEncoded
     ? `${fileNameWithoutSearchParams}-${searchParamsEncoded}`
     : fileNameWithoutSearchParams
-  // const fullDirName = `${outputDir}/${hostname}${dirName}`
+
   const fullDirName = `${outputDir}${dirName}`
   if (!fs.existsSync(fullDirName)) {
     fs.mkdirSync(fullDirName, { recursive: true })
   }
-  const fullFileName = `${fullDirName}${fileName}${fileNameSuffix || ''}`
-  console.log('writing file:', fullFileName, prettyBytes(entry.content.length))
-  fs.writeFileSync(fullFileName, entry.content)
+  return `${dirName}${fileName}${fileNameSuffix || ''}`
+}
+
+const outputFile = (outputDir: string, fileName: string, content: Buffer): void => {
+  console.log('writing file:', `${outputDir}${fileName}`, prettyBytes(content.length))
+  fs.writeFileSync(`${outputDir}${fileName}`, content)
 }
 
 const matcherToNginx = (matcher: string | RegExp): string => {
@@ -48,78 +48,170 @@ const matcherToNginx = (matcher: string | RegExp): string => {
   return `location ~ ${regex}`
 }
 
-const staticGen = async (output: string, nginxFile: string): Promise<void> => {
+const staticGen = async (contentOutput?: string, nginxFile?: string, serverName?: string): Promise<void> => {
   runtimeConfig.cacheEverything = true
   config.page.abortResourceRequests = false
   if (!preRenderConfig) {
     console.error('pre-render is not configured')
-    return
+    process.exit(1)
   }
-  // if (!staticGenConfig) {
-  //   console.error('static site generation is not configured')
-  //   return
-  // }
+  const output = contentOutput || staticGenConfig.contentOutput
+  if (!output) {
+    console.error('content output dir is not configured')
+    process.exit(1)
+  }
   await preRender()
 
   const entries = cache.listEntries()
-  // eslint-disable-next-line no-restricted-syntax
-  for (const [url, entry] of entries) {
-    console.log('entry', url)
-    outputFile(output, url, entry, '.html')
-  }
-  const assetEntries = cache.listAssetEntries()
-  // eslint-disable-next-line no-restricted-syntax
-  for (const [url, entry] of assetEntries) {
-    console.log('entry', url)
-    outputFile(output, url, entry)
-  }
 
-  console.log('server {')
-  console.log(`  root ${output};`)
-  console.log(`  location / {`)
-  console.log('    index index.html;')
-  console.log(`  }`)
-
-  config.rules.forEach((rule) => {
-    // console.log('rule', JSON.stringify(rule))
-
-    const matchers = buildMatcher(rule)
-    // console.log('matchers', matchers)
-
-    // console.log('upstream saa-fe-ssr {')
-    //
-    //      server 127.0.0.1:8080;
-    // }
-    //    location ~ ^/lessons/lesson-picture/.* {
-    //         proxy_pass https://saa-static.s3.amazonaws.com;
-    //     }
-
+  const processRule = async (rule: RoutingRule) => {
     switch (rule.rule) {
-      case 'page':
-      case 'page-proxy':
-        matchers.forEach((matcher) => {
-          console.log(`  ${matcherToNginx(matcher)} {`)
-          console.log('    try_files $uri $uri.html =404;')
-          console.log(`  }`)
-        })
+      case 'asset':
+        console.log(`copying assets: ${rule.dir} -> ${output}`)
+        await promisify(ncp)(rule.dir, output)
+        console.log('done copying')
         break
 
-      case 'asset':
-      case 'asset-proxy':
-        matchers.forEach((matcher) => {
-          console.log(`  ${matcherToNginx(matcher)} {`)
-          console.log('    try_files $uri =404;')
-          console.log(`  }`)
-        })
-        break
-      case 'proxy':
-        break
       default:
         break
     }
+  }
+
+  const processRules = async () => {
+    for (const rule of config.rules) {
+      // eslint-disable-next-line no-await-in-loop
+      await processRule(rule)
+    }
+  }
+
+  await processRules()
+
+  let nginxConfig = ''
+  let indentation = ''
+
+  const appendConfig = (str: string) => {
+    nginxConfig += `${indentation}${str}\n`
+  }
+
+  const appendBlock = (prefix: string, suffix: string, fn: () => void) => {
+    appendConfig(prefix)
+    indentation += '    '
+    fn()
+    indentation = indentation.slice(0, -4)
+    appendConfig(suffix)
+    nginxConfig += '\n'
+  }
+
+  const proxyRules: (ProxyRoutingRule & {
+    upstream: string
+    url: URL
+  })[] = config.rules
+    .filter((rule) => rule.rule === 'proxy')
+    .map((proxyRule: ProxyRoutingRule, index) => {
+      return {
+        upstream: `proxy-${index}`,
+        url: new URL(proxyRule.target),
+        ...proxyRule,
+      }
+    })
+
+  const writeExtraConfig = (extraConfig: any): void => {
+    if (typeof extraConfig === 'string') {
+      appendConfig(extraConfig)
+    } else if (typeof extraConfig === 'object') {
+      if (Array.isArray(extraConfig)) {
+        for (const [, value] of Object.entries(extraConfig)) {
+          writeExtraConfig(value)
+        }
+      } else {
+        for (const [key, value] of Object.entries(extraConfig)) {
+          appendBlock(`${key} {`, '}', () => {
+            writeExtraConfig(value)
+          })
+        }
+      }
+    }
+  }
+
+  proxyRules.forEach((proxyRule) => {
+    appendBlock(`upstream ${proxyRule.upstream} {`, '}', () => {
+      appendConfig(`server ${proxyRule.url.hostname}${proxyRule.url.port ? `:${proxyRule.url.port}` : ''};`)
+    })
   })
 
-  console.log('}')
+  appendBlock('server {', '}', () => {
+    if (serverName || staticGenConfig.nginxServerName) {
+      appendConfig(`server_name "${serverName || staticGenConfig.nginxServerName}";\n`)
+    }
+
+    if (staticGenConfig.nginxExtraConfig) {
+      writeExtraConfig(staticGenConfig.nginxExtraConfig)
+    }
+
+    appendConfig(`root ${output};\n`)
+
+    proxyRules.forEach((proxyRule) => {
+      const matchers = buildMatcher(proxyRule)
+      matchers.forEach((matcher) => {
+        appendBlock(`${matcherToNginx(matcher)} {`, '}', () => {
+          appendConfig(`proxy_pass ${proxyRule.url.protocol}//${proxyRule.upstream};`)
+        })
+      })
+    })
+
+    config.rules.forEach(async (rule) => {
+      const matchers = buildMatcher(rule)
+      switch (rule.rule) {
+        case 'asset':
+        case 'asset-proxy':
+          matchers.forEach((matcher) => {
+            appendBlock(`${matcherToNginx(matcher)} {`, '}', () => {
+              appendConfig('try_files $uri =404;')
+            })
+          })
+          break
+        default:
+          break
+      }
+    })
+
+    for (const [urlStr, entry] of entries) {
+      const fileName = getFileName(output, urlStr, '.html')
+      let { content } = entry
+      if (staticGenConfig.pageCleanUp) {
+        staticGenConfig.pageCleanUp.forEach(([regex, replacement]) => {
+          content = Buffer.from(content.toString().replace(new RegExp(regex), replacement))
+        })
+      }
+      outputFile(output, fileName, content)
+      const url = new URL(urlStr)
+      const { pathname, searchParams } = url
+      if (searchParams.toString().length > 0) {
+        console.warn('cannot route URLs with search query in nginx config', urlStr)
+      } else {
+        appendBlock(`location ${pathname} {`, '}', () => {
+          appendConfig('try_files $uri.html =404;')
+        })
+      }
+    }
+
+    const assetEntries = cache.listAssetEntries()
+    for (const [urlStr, entry] of assetEntries) {
+      console.log('entry', urlStr)
+      const fileName = getFileName(output, urlStr)
+      outputFile(output, fileName, entry.content)
+    }
+  })
+
+  const configFileOutput = nginxFile || staticGenConfig.nginxConfigOutputFile
+
+  if (configFileOutput) {
+    console.log('writing nginx config into', configFileOutput)
+    fs.writeFileSync(configFileOutput, nginxConfig)
+  } else {
+    console.log('nginx config:')
+    console.log(nginxConfig)
+  }
 }
 
 export default staticGen

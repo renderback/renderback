@@ -35,6 +35,7 @@ module.exports = {
   rules: {
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/no-use-before-define': 2,
+    'no-restricted-syntax': 'off',
     'no-use-before-define': 'off',
     'import/no-unresolved': 'off',
     'import/prefer-default-export': 'off',

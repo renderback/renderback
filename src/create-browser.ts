@@ -22,9 +22,7 @@ const createBrowser = async (): Promise<Browser> => {
       ],
     })
   }
-  console.error(
-    'neither BROWSER_EXECUTABLE nor BROWSER_WS_ENDPOINT configured, exiting now'
-  )
+  console.error('neither BROWSER_EXECUTABLE nor BROWSER_WS_ENDPOINT configured, exiting now')
   process.exit(1)
   return Promise.reject()
 }

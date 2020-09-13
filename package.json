@@ -9,6 +9,7 @@
   ],
   "dependencies": {
     "@rushstack/ts-command-line": "^4.6.4",
+    "@types/ncp": "^2.0.4",
     "@types/pretty-bytes": "^5.2.0",
     "errorhandler": "^1.5.1",
     "etag": "^1.8.1",
@@ -19,6 +20,7 @@
     "greenlock-express": "^4.0.3",
     "lodash": "^4.17.20",
     "mime-types": "^2.1.27",
+    "ncp": "^2.0.0",
     "pretty-bytes": "^5.4.1",
     "prom-client": "^12.0.0",
     "puppeteer-core": "^5.2.1",

@@ -70,18 +70,12 @@ app.post('/__ssr/admin/clear-cache', async (req, res) => {
     const shouldPreRender = typeof req.query['pre-render'] !== 'undefined'
     if (shouldPreRender) {
       if (!config.preRender) {
-        return res
-          .status(200)
-          .send(
-            `Cache cleared. Pre-rendering has not been run: pre-render is not configured.`
-          )
+        return res.status(200).send(`Cache cleared. Pre-rendering has not been run: pre-render is not configured.`)
       }
       if (config.preRender.paths.length === 0) {
         return res
           .status(200)
-          .send(
-            `Cache cleared. Pre-rendering has not been run: pre-render path are not configured.`
-          )
+          .send(`Cache cleared. Pre-rendering has not been run: pre-render path are not configured.`)
       }
       await preRender()
       return res.status(200).send(`Cache cleared. Pre-rendering has been run.`)
@@ -104,9 +98,7 @@ config.rules.forEach((rule) => {
 
     case 'asset':
       // eslint-disable-next-line no-case-declarations
-      const dir = rule.dir.startsWith('/')
-        ? rule.dir
-        : path.join(__dirname, rule.dir)
+      const dir = rule.dir.startsWith('/') ? rule.dir : path.join(__dirname, rule.dir)
       console.info(`configuring asset rule -- ${matcher} -> ${dir}`)
 
       app.use(matcher, async (req, resp, next) => {
@@ -117,9 +109,7 @@ config.rules.forEach((rule) => {
       break
     case 'asset-proxy':
       // eslint-disable-next-line no-case-declarations
-      console.info(
-        `configuring asset-proxy rule -- ${matcher} -> ${rule.target}`
-      )
+      console.info(`configuring asset-proxy rule -- ${matcher} -> ${rule.target}`)
       app.use(matcher, (req, resp, next) => {
         logRule(req.originalUrl, rule)
         return assetProxyRoute(rule, req, resp, next)
@@ -127,9 +117,7 @@ config.rules.forEach((rule) => {
       break
 
     case 'page':
-      console.info(
-        `configuring ${rule.rule} rule -- ${matcher} -> ${rule.source}`
-      )
+      console.info(`configuring ${rule.rule} rule -- ${matcher} -> ${rule.source}`)
       app.use(matcher, async (req, res) => {
         logRule(req.originalUrl, rule)
         return pageRoute(rule, req, res)
@@ -137,18 +125,14 @@ config.rules.forEach((rule) => {
       break
 
     case 'page-proxy':
-      console.info(
-        `configuring ${rule.rule} rule -- ${matcher} -> ${rule.target}`
-      )
+      console.info(`configuring ${rule.rule} rule -- ${matcher} -> ${rule.target}`)
       app.use(matcher, async (req, res, next) => {
         logRule(req.originalUrl, rule)
 
         if (req.header('User-Agent') === config.userAgent) {
           req.url = req.originalUrl
           if (config.log.requestsFromHeadless) {
-            console.log(
-              `request from headless: ${req.originalUrl}, proxying -> ${rule.target}${req.url}`
-            )
+            console.log(`request from headless: ${req.originalUrl}, proxying -> ${rule.target}${req.url}`)
           }
           return proxy(rule.target)(req, res, next)
         }

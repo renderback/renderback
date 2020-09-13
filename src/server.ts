@@ -14,9 +14,7 @@ const command = argv._[0]
 switch (command) {
   case 'serve':
     startHttpServer(() => {
-      console.log(
-        `server started at http://${envConfig.hostname}:${config.port}`
-      )
+      console.log(`server started at http://${envConfig.hostname}:${config.port}`)
     })
     break
   case 'greenlock':
@@ -46,22 +44,14 @@ switch (command) {
   case 'static-gen':
     console.log(`generating the static site...`)
     // eslint-disable-next-line no-case-declarations
-    const { output, 'nginx-file': nginxFile } = argv
+    const { output, 'nginx-file': nginxFile, 'server-name': serverName } = argv
     if (!output) {
       console.error(`output is not specified (use --output=/path/to/output)`)
       process.exit(1)
     }
-    if (!nginxFile) {
-      console.error(
-        `nginx file is not specified (use --nginx-file=/path/to/nginx.conf)`
-      )
-      process.exit(1)
-    }
     startHttpServer(async (server) => {
-      console.log(
-        `server started at http://${envConfig.hostname}:${config.port}`
-      )
-      await staticGen(output, nginxFile)
+      console.log(`server started at http://${envConfig.hostname}:${config.port}`)
+      await staticGen(output, nginxFile, serverName)
       server.close()
       process.exit(0)
     })
