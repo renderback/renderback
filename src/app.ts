@@ -1,28 +1,16 @@
-import express, { Request, Response } from 'express'
+import express from 'express'
 import errorHandler from 'errorhandler'
 import path from 'path'
-import fs from 'fs'
-import mime from 'mime-types'
 import proxy from 'express-http-proxy'
 import promMid from 'express-prometheus-middleware'
-import { NextFunction } from 'express-serve-static-core'
-import renderUrl from './render-url'
-import config, {
-  envConfig,
-  PageProxyRoutingRule,
-  PageRoutingRule,
-  ProxyRoutingRule,
-  RoutingRule,
-  StaticAssetProxyRoutingRule,
-  StaticAssetRoutingRule,
-} from './config'
+import config, { RoutingRule } from './config'
 import cache from './cache'
 import preRender from './pre-render'
-import { modifyUrl } from './util'
 import { proxyRoute } from './routes/proxy-route'
 import { assetRoute } from './routes/asset-route'
 import { assetProxyRoute } from './routes/asset-proxy-route'
 import { pageRoute } from './routes/page-route'
+import { buildMatcher } from './util'
 
 const { adminAccessKey } = config
 
@@ -31,16 +19,6 @@ const app = express()
 app.enable('etag')
 app.use(promMid())
 app.use(errorHandler())
-
-const buildMatcher = (rule: RoutingRule) => {
-  const paths = rule.path ? rule.path : []
-  const regexes = rule.regex ? rule.regex.map((p) => new RegExp(p)) : []
-  const extensions = rule.ext
-    ? [new RegExp(`^.+\\.(${rule.ext.join('|')})$`)]
-    : []
-
-  return [...paths, ...regexes, ...extensions]
-}
 
 const shortRuleDescription = (rule: RoutingRule): string => {
   switch (rule.rule) {
