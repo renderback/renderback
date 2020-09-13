@@ -18,11 +18,7 @@ async function renderPage(page: Page): Promise<string> {
     })
   } catch (err) {
     console.error(err)
-    throw new Error(
-      `Wait for selector (${
-        pageConfig.waitSelector
-      }) timed out:\n${await page.content()}`
-    )
+    throw new Error(`Wait for selector (${pageConfig.waitSelector}) timed out:\n${await page.content()}`)
   }
 
   return /* await */ page.content()

@@ -5,9 +5,7 @@ import cache, { CacheEntry } from './cache'
 import createBrowser from './create-browser'
 import { renderTimeMetric } from './metrics'
 
-const renderUrl = async (
-  url: string
-): Promise<CacheEntry & { ttRenderMs?: number }> => {
+const renderUrl = async (url: string): Promise<CacheEntry & { ttRenderMs?: number }> => {
   const maybeCached = cache.get(url)
   if (maybeCached) {
     return maybeCached

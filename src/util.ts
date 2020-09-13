@@ -9,9 +9,7 @@ export const modifyUrl = (modifyScript: string, url: string): string => {
 export const buildMatcher = (rule: RoutingRule): (string | RegExp)[] => {
   const paths = rule.path ? rule.path : []
   const regexes = rule.regex ? rule.regex.map((p) => new RegExp(p)) : []
-  const extensions = rule.ext
-    ? [new RegExp(`^.+\\.(${rule.ext.join('|')})$`)]
-    : []
+  const extensions = rule.ext ? [new RegExp(`^.+\\.(${rule.ext.join('|')})$`)] : []
 
   return [...paths, ...regexes, ...extensions]
 }

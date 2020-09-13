@@ -12,8 +12,6 @@ export const proxyRoute = async (
 ): Promise<Response> => {
   return proxy(rule.target, {
     proxyReqPathResolver: (request) =>
-      rule.modifyUrl
-        ? modifyUrl(rule.modifyUrl, request.originalUrl)
-        : request.originalUrl,
+      rule.modifyUrl ? modifyUrl(rule.modifyUrl, request.originalUrl) : request.originalUrl,
   })(req, resp, next)
 }
