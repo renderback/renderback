@@ -14,7 +14,7 @@ WORKDIR /home/node
 EXPOSE 80
 EXPOSE 443
 
-RUN npm install -g --production spa-ssr-proxy@0.0.6
+RUN npm install -g --production spa-ssr-proxy@0.0.8
 
 USER node
 CMD ["run.sh"]

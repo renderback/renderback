@@ -1,8 +1,8 @@
 import etag from 'etag'
-import config from './config'
+import config, { runtimeConfig } from './config'
 
 export interface CacheEntry {
-  html: string
+  content: Buffer
   etag: string
 }
 
@@ -11,8 +11,18 @@ export class Cache {
 
   cache = new Map<string, CacheEntry>()
 
+  assetsCache = new Map<string, CacheEntry>()
+
   constructor(enabled: boolean) {
     this.enabled = enabled
+  }
+
+  listEntries(): IterableIterator<[string, CacheEntry]> {
+    return this.cache.entries()
+  }
+
+  listAssetEntries(): IterableIterator<[string, CacheEntry]> {
+    return this.assetsCache.entries()
   }
 
   get(url: string): CacheEntry | undefined {
@@ -22,13 +32,27 @@ export class Cache {
     return undefined
   }
 
-  set(url: string, html: string): CacheEntry {
+  set(url: string, content: string): CacheEntry {
     const entry = {
-      html,
-      etag: etag(html),
+      content: Buffer.from(content),
+      etag: etag(content),
     }
-    if (this.enabled) {
+    if (this.enabled || runtimeConfig.cacheEverything) {
       this.cache.set(url, entry)
+      if (config.log.cache) {
+        console.info(`saved ${url} to cache.`)
+      }
+    }
+    return entry
+  }
+
+  setAsset(url: string, buffer: Buffer): CacheEntry {
+    const entry = {
+      content: buffer,
+      etag: etag(buffer),
+    }
+    if (this.enabled || runtimeConfig.cacheEverything) {
+      this.assetsCache.set(url, entry)
       if (config.log.cache) {
         console.info(`saved ${url} to cache.`)
       }
@@ -38,10 +62,11 @@ export class Cache {
 
   clear(): void {
     this.cache = new Map()
-    console.log('cache cleared.')
+    this.assetsCache = new Map()
+    console.log('enableCache cleared.')
   }
 }
 
-const cache: Cache = new Cache(config.cacheResponses)
+const cache: Cache = new Cache(config.enableCache)
 
 export default cache

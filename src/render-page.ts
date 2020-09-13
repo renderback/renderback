@@ -1,7 +1,9 @@
 import { Page } from 'puppeteer-core'
-import { PageConfig } from './config'
+import config from './config'
 
-async function renderPage(page: Page, pageConfig: PageConfig): Promise<string> {
+const { page: pageConfig } = config
+
+async function renderPage(page: Page): Promise<string> {
   try {
     // networkidle0 waits for the network to be idle (no requests for 500ms).
     // The page's JS has likely produced markup by this point, but wait longer

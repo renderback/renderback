@@ -6,7 +6,8 @@ if ! git diff-files --quiet --ignore-submodules --; then
   CLEAN=0
 fi
 VERSION=$(cat .version)
-if [[ $VERSION == "SNAPSHOT" ]] | [[ $CLEAN -eq 0 ]]; then
+#if [[ $VERSION == "SNAPSHOT" ]] | [[ $CLEAN -eq 0 ]]; then
+if [[ $VERSION == "SNAPSHOT" ]]; then
   SHA=$(git rev-parse HEAD | cut -c 1-7)
   IS_SHA_VERSION=1
   if [[ $CLEAN -eq 0 ]]; then

@@ -1,33 +1,39 @@
 import createPage from './create-page'
 import renderPage from './render-page'
 import cache from './cache'
-import config, { PageConfig, PreRenderConfig } from './config'
+import config, { envConfig } from './config'
 import createBrowser from './create-browser'
+import { renderTimeMetric } from './metrics'
 
-const preRender = async (
-  preRenderConfig: PreRenderConfig,
-  pageConfig: PageConfig,
-  startUrl?: string
-): Promise<void> => {
-  const target = startUrl || `http://express-http.local:${config.port}`
+const { preRender: preRenderConfig, page: pageConfig } = config
+
+const preRender = async (): Promise<void> => {
+  if (!preRenderConfig) {
+    console.error(`pre-render is not configured`)
+  }
+  const target = `http://${envConfig.hostname}:${config.port}`
 
   const browser = await createBrowser()
-  const page = await createPage(browser, pageConfig)
-
-  if (config.log.headless) {
-    console.log(`pre-render: navigating to: ${target}/`)
-  }
+  const page = await createPage(browser)
 
   const start = Date.now()
+  const timerHandle = renderTimeMetric.startTimer({ url: `${target}/` })
+  if (config.log.headless) {
+    console.log(`pre-render: navigating to:`, `${target}/`)
+  }
   await page.goto(`${target}/`, { waitUntil: 'networkidle0' })
-  const html = await renderPage(page, pageConfig)
+  const html = await renderPage(page)
+  timerHandle()
   const ttRenderMs = Date.now() - start
-  console.info(`Rendered page ${target}/ in: ${ttRenderMs}ms.`)
+  if (config.log.renderTime) {
+    console.info(`rendered ${target}/: ${ttRenderMs}ms.`)
+  }
   cache.set(`${target}/`, html)
 
   const processPath = async (path: string) => {
     const url = `${target}${path}`
     const pathStart = Date.now()
+    const pathTimerHandle = renderTimeMetric.startTimer({ url: `${target}/` })
     if (config.log.headless) {
       console.log(`pre-render: navigating to: ${url}`)
     }
@@ -38,14 +44,17 @@ const preRender = async (
         // eslint-disable-next-line no-eval
         eval(navigateScript)
       },
-      pageConfig.resetSelectorScript,
+      pageConfig.resetScript,
       // eslint-disable-next-line no-template-curly-in-string
       pageConfig.navigateScript.replace('${url}', `${url}`)
     )
 
-    const pathHtml = await renderPage(page, pageConfig)
+    const pathHtml = await renderPage(page)
+    pathTimerHandle()
     const pathRenderMs = Date.now() - pathStart
-    console.info(`Rendered page ${url} in: ${pathRenderMs}ms.`)
+    if (config.log.renderTime) {
+      console.info(`rendered ${url}: ${pathRenderMs}ms.`)
+    }
     cache.set(url, pathHtml)
   }
 

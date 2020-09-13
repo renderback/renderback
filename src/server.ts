@@ -1,26 +1,32 @@
-import errorHandler from 'errorhandler'
 import greenlock from 'greenlock-express'
+import { Server } from 'http'
 import app from './app'
-import config, { envConfig } from './config'
+import config, { argv, envConfig } from './config'
 import preRender from './pre-render'
+import staticGen from './static-gen'
 
-console.log(`use greenlock: ${envConfig.useGreenlock}`)
-if (envConfig.useGreenlock) {
-  console.log(`greenlock maintainer: ${envConfig.greenlockMaintainer}`)
-  if (!envConfig.greenlockMaintainer) {
-    console.log(`greenlock maintainer is missing, disabling greenlock`)
-    envConfig.useGreenlock = false
-  }
-}
-console.log(`will pre-render: ${envConfig.shouldPreRender}`)
-if (envConfig.shouldPreRender) {
-  console.log(`pre-render start url: ${envConfig.preRenderStartUrl}`)
+const startHttpServer = (callback: (server: Server) => void) => {
+  console.log(`starting http server...`)
+  const server = app.listen(config.port, '0.0.0.0', () => callback(server))
 }
 
-app.use(errorHandler())
-
-const server = envConfig.useGreenlock
-  ? greenlock
+const command = argv._[0]
+switch (command) {
+  case 'serve':
+    startHttpServer(() => {
+      console.log(
+        `server started at http://${envConfig.hostname}:${config.port}`
+      )
+    })
+    break
+  case 'greenlock':
+    console.log(`starting greenlock http server...`)
+    if (!envConfig.greenlockMaintainer) {
+      console.log(`greenlock maintainer is missing, disabling greenlock`)
+      process.exit(1)
+    }
+    console.log(`greenlock maintainer: ${envConfig.greenlockMaintainer}`)
+    greenlock
       .init({
         packageRoot: __dirname,
         maintainerEmail: envConfig.greenlockMaintainer,
@@ -28,18 +34,40 @@ const server = envConfig.useGreenlock
         cluster: false,
       })
       .serve(app)
-  : app.listen(config.port, async () => {
-      if (config.preRender && envConfig.shouldPreRender) {
-        await preRender(
-          config.preRender,
-          config.pageConfig,
-          envConfig.preRenderStartUrl
-        )
-      }
-      console.log(
-        `Server started at http://${envConfig.hostname}:${config.port}`
+    break
+  case 'pre-render':
+    console.log(`pre-rendering the pages...`)
+    preRender()
+      .then(() => {
+        console.log('pre-render finished')
+      })
+      .catch((e) => console.error('pre-render failed', e))
+    break
+  case 'static-gen':
+    console.log(`generating the static site...`)
+    // eslint-disable-next-line no-case-declarations
+    const { output, 'nginx-file': nginxFile } = argv
+    if (!output) {
+      console.error(`output is not specified (use --output=/path/to/output)`)
+      process.exit(1)
+    }
+    if (!nginxFile) {
+      console.error(
+        `nginx file is not specified (use --nginx-file=/path/to/nginx.conf)`
       )
-      console.log('Press Ctrl+C to quit')
+      process.exit(1)
+    }
+    startHttpServer(async (server) => {
+      console.log(
+        `server started at http://${envConfig.hostname}:${config.port}`
+      )
+      await staticGen(output, nginxFile)
+      server.close()
+      process.exit(0)
     })
+    break
+  default:
+    console.log(`unrecognized command: ${command}`)
+}
 
-export default server
+export default {}

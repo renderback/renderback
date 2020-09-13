@@ -1,19 +1,15 @@
 import { Browser, Page, Request } from 'puppeteer-core'
-import config, { PageConfig } from './config'
+import config from './config'
 
-const isRequestBlacklisted = (
-  request: Request,
-  pageConfig: PageConfig
-): boolean => {
+const { page: pageConfig } = config
+
+const isRequestBlacklisted = (request: Request): boolean => {
   return pageConfig.requestBlacklist
     .map((pattern) => new RegExp(pattern))
     .some((regexp) => request.url().match(regexp))
 }
 
-const createPage = async (
-  browser: Browser,
-  pageConfig: PageConfig
-): Promise<Page> => {
+const createPage = async (browser: Browser): Promise<Page> => {
   const page = await browser.newPage()
   await page.setRequestInterception(true)
   if (config.log.pageConsole) {
@@ -26,6 +22,13 @@ const createPage = async (
       }
     })
   }
+
+  if (config.log.pageLocation) {
+    page.on('load', () => {
+      page.evaluate('console.log("Browser location", document.location)')
+    })
+  }
+
   if (config.log.pageErrors) {
     page.on('pageerror', ({ message }) => console.log('Page: error:', message))
   }
@@ -40,7 +43,7 @@ const createPage = async (
         ['image', 'stylesheet', 'font'].indexOf(request.resourceType()) !== -1
       if (
         (resourceRequest && !pageConfig.abortResourceRequests) ||
-        (!resourceRequest && !isRequestBlacklisted(request, pageConfig))
+        (!resourceRequest && !isRequestBlacklisted(request))
       ) {
         console.error(
           `Page: request failed: ${request.resourceType()} ${
@@ -57,7 +60,7 @@ const createPage = async (
       ['image', 'stylesheet', 'font'].indexOf(request.resourceType()) !== -1
     ) {
       request.abort()
-    } else if (isRequestBlacklisted(request, pageConfig)) {
+    } else if (isRequestBlacklisted(request)) {
       console.log('Blacklisting request:', request.url())
       request.abort()
     } else {
