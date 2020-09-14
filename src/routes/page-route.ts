@@ -1,29 +1,25 @@
 import { Request, Response } from 'express'
-import config, { envConfig, PageProxyRoutingRule, PageRoutingRule } from '../config'
+import config, { envConfig, PageProxyRoute, PageRoute } from '../config'
 import renderUrl from '../render-url'
 
-export const pageRoute = async (
-  rule: PageRoutingRule | PageProxyRoutingRule,
-  req: Request,
-  res: Response
-): Promise<Response> => {
+export const pageRoute = async (route: PageRoute | PageProxyRoute, req: Request, res: Response): Promise<Response> => {
   if (req.header('User-Agent') === config.userAgent) {
-    if (rule.rule === 'page') {
-      if (config.log.requestsFromHeadless) {
-        console.log(`request from headless: ${req.originalUrl}, serving ${rule.source}`)
+    if (route.type === 'page') {
+      if (config.log.selfRequests) {
+        console.log(`[page-route] self request: ${req.originalUrl}, serving ${route.source}`)
       }
-      res.status(200).sendFile(`${rule.source}`)
+      res.status(200).sendFile(`${route.source}`)
       return res
     }
     console.error(
-      `!!! unexpected state: request from headless, rule is ${rule.rule}, should not have ended up in pageRoute`
+      `[page-route] !!! unexpected state: self request, route type is ${route.type}, should not have ended up here`
     )
     process.exit(1)
   }
   const { content, etag, ttRenderMs } = await renderUrl(
-    rule.rule === 'page-proxy'
-      ? `${rule.target}${req.originalUrl}`
-      : `http://${envConfig.hostname}:${config.port}${req.originalUrl}`
+    route.type === 'page-proxy'
+      ? `${route.target}${req.originalUrl}`
+      : `http://${envConfig.hostname}:${config.httpPort}${req.originalUrl}`
   )
   if (ttRenderMs) {
     // See https://w3c.github.io/server-timing/.

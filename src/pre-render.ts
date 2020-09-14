@@ -5,28 +5,28 @@ import config, { envConfig } from './config'
 import createBrowser from './create-browser'
 import { renderTimeMetric } from './metrics'
 
-const { preRender: preRenderConfig, page: pageConfig } = config
+const { preRender: preRenderEnabled, preRenderPaths, page: pageConfig } = config
 
 const preRender = async (): Promise<void> => {
-  if (!preRenderConfig) {
-    console.error(`pre-render is not configured`)
+  if (!preRenderEnabled) {
+    console.error(`pre-render is not enabled`)
   }
-  const target = `http://${envConfig.hostname}:${config.port}`
+  const target = `http://${envConfig.hostname}:${config.httpPort}`
 
   const browser = await createBrowser()
   const page = await createPage(browser)
 
   const start = Date.now()
   const timerHandle = renderTimeMetric.startTimer({ url: `${target}/` })
-  if (config.log.headless) {
-    console.log(`pre-render: navigating to:`, `${target}/`)
+  if (config.log.navigation) {
+    console.log(`[pre-render] navigating to:`, `${target}/`)
   }
   await page.goto(`${target}/`, { waitUntil: 'networkidle0' })
   const html = await renderPage(page)
   timerHandle()
   const ttRenderMs = Date.now() - start
   if (config.log.renderTime) {
-    console.info(`rendered ${target}/: ${ttRenderMs}ms.`)
+    console.info(`[pre-render] rendered ${target}/: ${ttRenderMs}ms.`)
   }
   cache.set(`${target}/`, html)
 
@@ -34,26 +34,32 @@ const preRender = async (): Promise<void> => {
     const url = `${target}${path}`
     const pathStart = Date.now()
     const pathTimerHandle = renderTimeMetric.startTimer({ url: `${target}/` })
-    if (config.log.headless) {
-      console.log(`pre-render: navigating to: ${url}`)
+    if (pageConfig.preNavigationScript) {
+      if (config.log.navigation) {
+        console.log(`[pre-render] running pre-navigation script`)
+      }
+      await page.evaluate((preNavigationScript) => {
+        // eslint-disable-next-line no-eval
+        eval(preNavigationScript)
+      }, pageConfig.preNavigationScript)
+    }
+    if (config.log.navigation) {
+      console.log(`[pre-render] navigating to: ${url} (${pageConfig.navigateFunction})`)
     }
     await page.evaluate(
-      (resetSelectorScript, navigateScript) => {
+      (navigateFunction, navigateToURL) => {
         // eslint-disable-next-line no-eval
-        eval(resetSelectorScript)
-        // eslint-disable-next-line no-eval
-        eval(navigateScript)
+        eval(`(${navigateFunction})('${navigateToURL}')`)
       },
-      pageConfig.resetScript,
-      // eslint-disable-next-line no-template-curly-in-string
-      pageConfig.navigateScript.replace('${url}', `${url}`)
+      pageConfig.navigateFunction,
+      url
     )
 
     const pathHtml = await renderPage(page)
     pathTimerHandle()
     const pathRenderMs = Date.now() - pathStart
     if (config.log.renderTime) {
-      console.info(`rendered ${url}: ${pathRenderMs}ms.`)
+      console.info(`[pre-render] rendered ${url}: ${pathRenderMs}ms.`)
     }
     cache.set(url, pathHtml)
   }
@@ -66,7 +72,7 @@ const preRender = async (): Promise<void> => {
     }
   }
 
-  await processPaths(preRenderConfig.paths)
+  await processPaths(preRenderPaths)
 }
 
 export default preRender

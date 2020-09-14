@@ -39,9 +39,6 @@ export class Cache {
     }
     if (this.enabled || runtimeConfig.cacheEverything) {
       this.cache.set(url, entry)
-      if (config.log.cache) {
-        console.info(`saved ${url} to cache.`)
-      }
     }
     return entry
   }
@@ -53,9 +50,6 @@ export class Cache {
     }
     if (this.enabled || runtimeConfig.cacheEverything) {
       this.assetsCache.set(url, entry)
-      if (config.log.cache) {
-        console.info(`saved ${url} to cache.`)
-      }
     }
     return entry
   }
@@ -63,7 +57,7 @@ export class Cache {
   clear(): void {
     this.cache = new Map()
     this.assetsCache = new Map()
-    console.log('enableCache cleared.')
+    console.log('[cache] cache cleared')
   }
 }
 

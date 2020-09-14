@@ -1,17 +1,17 @@
 import { Request, Response } from 'express'
 import { NextFunction } from 'express-serve-static-core'
 import proxy from 'express-http-proxy'
-import { ProxyRoutingRule } from '../config'
+import { ProxyRoute } from '../config'
 import { modifyUrl } from '../util'
 
 export const proxyRoute = async (
-  rule: ProxyRoutingRule,
+  route: ProxyRoute,
   req: Request,
   resp: Response,
   next: NextFunction
 ): Promise<Response> => {
-  return proxy(rule.target, {
+  return proxy(route.target, {
     proxyReqPathResolver: (request) =>
-      rule.modifyUrl ? modifyUrl(rule.modifyUrl, request.originalUrl) : request.originalUrl,
+      route.modifyUrl ? modifyUrl(route.modifyUrl, request.originalUrl) : request.originalUrl,
   })(req, resp, next)
 }

@@ -1,11 +1,11 @@
 import { Request, Response } from 'express'
 import { NextFunction } from 'express-serve-static-core'
 import proxy from 'express-http-proxy'
-import { runtimeConfig, StaticAssetProxyRoutingRule } from '../config'
+import { runtimeConfig, AssetProxyRoute } from '../config'
 import cache from '../cache'
 
 export const assetProxyRoute = async (
-  rule: StaticAssetProxyRoutingRule,
+  route: AssetProxyRoute,
   req: Request,
   resp: Response,
   next: NextFunction
@@ -21,9 +21,9 @@ export const assetProxyRoute = async (
       cache.setAsset(`${userReq.protocol}://${userReq.hostname}${userReq.url}`, proxyResData)
       return proxyResData
     }
-    return proxy(rule.target, {
+    return proxy(route.target, {
       userResDecorator,
     })(req, resp, next)
   }
-  return proxy(rule.target)(req, resp, next)
+  return proxy(route.target)(req, resp, next)
 }

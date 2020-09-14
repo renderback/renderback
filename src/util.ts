@@ -1,4 +1,4 @@
-import { RoutingRule } from './config'
+import { Route } from './config'
 
 export const modifyUrl = (modifyScript: string, url: string): string => {
   // eslint-disable-next-line no-eval
@@ -6,10 +6,10 @@ export const modifyUrl = (modifyScript: string, url: string): string => {
   return modifyFunction(url)
 }
 
-export const buildMatcher = (rule: RoutingRule): (string | RegExp)[] => {
-  const paths = rule.path ? rule.path : []
-  const regexes = rule.regex ? rule.regex.map((p) => new RegExp(p)) : []
-  const extensions = rule.ext ? [new RegExp(`^.+\\.(${rule.ext.join('|')})$`)] : []
+export const buildMatcher = (route: Route): (string | RegExp)[] => {
+  const paths = route.path ? route.path : []
+  const regexes = route.regex ? route.regex.map((p) => new RegExp(p)) : []
+  const extensions = route.ext ? [new RegExp(`^.+\\.(${route.ext.join('|')})$`)] : []
 
   return [...paths, ...regexes, ...extensions]
 }

@@ -3,7 +3,7 @@ import errorHandler from 'errorhandler'
 import path from 'path'
 import proxy from 'express-http-proxy'
 import promMid from 'express-prometheus-middleware'
-import config, { RoutingRule } from './config'
+import config, { Route } from './config'
 import cache from './cache'
 import preRender from './pre-render'
 import { proxyRoute } from './routes/proxy-route'
@@ -20,37 +20,37 @@ app.enable('etag')
 app.use(promMid())
 app.use(errorHandler())
 
-const shortRuleDescription = (rule: RoutingRule): string => {
-  switch (rule.rule) {
+const shortRouteDescription = (route: Route): string => {
+  switch (route.type) {
     case 'page':
-      return `${rule.rule} -> ${rule.source}`
+      return `${route.type} -> ${route.source}`
     case 'asset':
-      return `${rule.rule} -> ${rule.dir}`
+      return `${route.type} -> ${route.dir}`
     case 'proxy':
-      return `${rule.rule} -> ${rule.target}`
+      return `${route.type} -> ${route.target}`
     case 'asset-proxy':
-      return `${rule.rule} -> ${rule.target}`
+      return `${route.type} -> ${route.target}`
     case 'page-proxy':
-      return `${rule.rule} -> ${rule.target}`
+      return `${route.type} -> ${route.target}`
     case 'not-found':
-      return `${rule.rule}`
+      return `${route.type}`
     default:
-      return JSON.stringify(rule)
+      return JSON.stringify(route)
   }
 }
 
-const logRule = (url: string, rule: RoutingRule) => {
-  switch (config.log.ruleMatch) {
+const logRoute = (url: string, route: Route) => {
+  switch (config.log.routeMatch) {
     case 0:
       return
     case 1:
-      console.log(`${url} -- `, rule.rule)
+      console.log(`[app] route match ${url} -- `, route.type)
       break
     case 2:
-      console.log(`${url} -- ${shortRuleDescription(rule)}`)
+      console.log(`[app] route match ${url} -- ${shortRouteDescription(route)}`)
       break
     default:
-      console.log(`${url} -- `, JSON.stringify(rule))
+      console.log(`[app] route match ${url} -- `, JSON.stringify(route))
   }
 }
 
@@ -72,7 +72,7 @@ app.post('/__ssr/admin/clear-cache', async (req, res) => {
       if (!config.preRender) {
         return res.status(200).send(`Cache cleared. Pre-rendering has not been run: pre-render is not configured.`)
       }
-      if (config.preRender.paths.length === 0) {
+      if (config.preRenderPaths.length === 0) {
         return res
           .status(200)
           .send(`Cache cleared. Pre-rendering has not been run: pre-render path are not configured.`)
@@ -85,64 +85,64 @@ app.post('/__ssr/admin/clear-cache', async (req, res) => {
   return res.status(401).send('Unauthorized')
 })
 
-config.rules.forEach((rule) => {
-  const matcher = buildMatcher(rule)
-  switch (rule.rule) {
+config.routes.forEach((route) => {
+  const matcher = buildMatcher(route)
+  switch (route.type) {
     case 'proxy':
-      console.info(`configuring proxy rule -- ${matcher} -> ${rule.target}`)
+      console.info(`[app] configuring proxy route -- ${matcher} -> ${route.target}`)
       app.use(matcher, (req, resp, next) => {
-        logRule(req.originalUrl, rule)
-        return proxyRoute(rule, req, resp, next)
+        logRoute(req.originalUrl, route)
+        return proxyRoute(route, req, resp, next)
       })
       break
 
     case 'asset':
       // eslint-disable-next-line no-case-declarations
-      const dir = rule.dir.startsWith('/') ? rule.dir : path.join(__dirname, rule.dir)
-      console.info(`configuring asset rule -- ${matcher} -> ${dir}`)
+      const dir = route.dir.startsWith('/') ? route.dir : path.join(__dirname, route.dir)
+      console.info(`[app] configuring asset route -- ${matcher} -> ${dir}`)
 
       app.use(matcher, async (req, resp, next) => {
-        logRule(req.originalUrl, rule)
-        return assetRoute(rule, dir, req, resp, next)
+        logRoute(req.originalUrl, route)
+        return assetRoute(route, dir, req, resp, next)
       })
 
       break
     case 'asset-proxy':
       // eslint-disable-next-line no-case-declarations
-      console.info(`configuring asset-proxy rule -- ${matcher} -> ${rule.target}`)
+      console.info(`[app] configuring asset-proxy route -- ${matcher} -> ${route.target}`)
       app.use(matcher, (req, resp, next) => {
-        logRule(req.originalUrl, rule)
-        return assetProxyRoute(rule, req, resp, next)
+        logRoute(req.originalUrl, route)
+        return assetProxyRoute(route, req, resp, next)
       })
       break
 
     case 'page':
-      console.info(`configuring ${rule.rule} rule -- ${matcher} -> ${rule.source}`)
+      console.info(`[app] configuring ${route.type} route -- ${matcher} -> ${route.source}`)
       app.use(matcher, async (req, res) => {
-        logRule(req.originalUrl, rule)
-        return pageRoute(rule, req, res)
+        logRoute(req.originalUrl, route)
+        return pageRoute(route, req, res)
       })
       break
 
     case 'page-proxy':
-      console.info(`configuring ${rule.rule} rule -- ${matcher} -> ${rule.target}`)
+      console.info(`[app] configuring ${route.type} route -- ${matcher} -> ${route.target}`)
       app.use(matcher, async (req, res, next) => {
-        logRule(req.originalUrl, rule)
+        logRoute(req.originalUrl, route)
 
         if (req.header('User-Agent') === config.userAgent) {
           req.url = req.originalUrl
-          if (config.log.requestsFromHeadless) {
-            console.log(`request from headless: ${req.originalUrl}, proxying -> ${rule.target}${req.url}`)
+          if (config.log.selfRequests) {
+            console.log(`[app] self request: ${req.originalUrl}, proxying -> ${route.target}${req.url}`)
           }
-          return proxy(rule.target)(req, res, next)
+          return proxy(route.target)(req, res, next)
         }
 
-        return pageRoute(rule, req, res)
+        return pageRoute(route, req, res)
       })
       break
 
     default:
-      console.error('unrecognized routing rule', rule)
+      console.error('[app] unrecognized route type', route)
       break
   }
 })

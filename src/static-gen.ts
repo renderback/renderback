@@ -1,14 +1,13 @@
 import fs from 'fs'
 import path from 'path'
 import prettyBytes from 'pretty-bytes'
-import { ncp } from 'ncp'
-import { promisify } from 'util'
 import preRender from './pre-render'
-import config, { ProxyRoutingRule, RoutingRule, runtimeConfig } from './config'
+import config, { ProxyRoute, Route, runtimeConfig } from './config'
 import cache from './cache'
 import { buildMatcher } from './util'
+import { copyDirRecursiveSync } from './copy-dir'
 
-const { static: staticGenConfig, preRender: preRenderConfig } = config
+const { static: staticGenConfig, preRender: preRenderEnabled } = config
 
 const getFileName = (outputDir: string, urlString: string, fileNameSuffix?: string): string => {
   const url = new URL(urlString)
@@ -33,7 +32,7 @@ const getFileName = (outputDir: string, urlString: string, fileNameSuffix?: stri
 }
 
 const outputFile = (outputDir: string, fileName: string, content: Buffer): void => {
-  console.log('writing file:', `${outputDir}${fileName}`, prettyBytes(content.length))
+  console.log('[static-site] writing file:', `${outputDir}${fileName}`, prettyBytes(content.length))
   fs.writeFileSync(`${outputDir}${fileName}`, content)
 }
 
@@ -48,28 +47,31 @@ const matcherToNginx = (matcher: string | RegExp): string => {
   return `location ~ ${regex}`
 }
 
-const staticGen = async (contentOutput?: string, nginxFile?: string, serverName?: string): Promise<void> => {
+const staticGen = async (): Promise<void> => {
   runtimeConfig.cacheEverything = true
-  config.page.abortResourceRequests = false
-  if (!preRenderConfig) {
-    console.error('pre-render is not configured')
+  if (config.routes.some((route) => route.type === 'asset-proxy')) {
+    config.page.abortResourceRequests = false
+  }
+  if (!preRenderEnabled) {
+    console.error('[static-site] pre-render is not enabled')
     process.exit(1)
   }
-  const output = contentOutput || staticGenConfig.contentOutput
-  if (!output) {
+  if (!staticGenConfig.contentOutput) {
     console.error('content output dir is not configured')
     process.exit(1)
   }
+  console.log(`[static-site] generating...`)
+  console.log(`[static-site] pre-rendering...`)
   await preRender()
 
   const entries = cache.listEntries()
 
-  const processRule = async (rule: RoutingRule) => {
-    switch (rule.rule) {
+  const processRoute = async (route: Route) => {
+    switch (route.type) {
       case 'asset':
-        console.log(`copying assets: ${rule.dir} -> ${output}`)
-        await promisify(ncp)(rule.dir, output)
-        console.log('done copying')
+        console.log(`[static-site] copying assets: ${route.dir} -> ${staticGenConfig.contentOutput}`)
+        copyDirRecursiveSync(route.dir, staticGenConfig.contentOutput)
+        console.log('[static-site] done copying')
         break
 
       default:
@@ -77,14 +79,14 @@ const staticGen = async (contentOutput?: string, nginxFile?: string, serverName?
     }
   }
 
-  const processRules = async () => {
-    for (const rule of config.rules) {
+  const processRoutes = async () => {
+    for (const route of config.routes) {
       // eslint-disable-next-line no-await-in-loop
-      await processRule(rule)
+      await processRoute(route)
     }
   }
 
-  await processRules()
+  await processRoutes()
 
   let nginxConfig = ''
   let indentation = ''
@@ -102,16 +104,16 @@ const staticGen = async (contentOutput?: string, nginxFile?: string, serverName?
     nginxConfig += '\n'
   }
 
-  const proxyRules: (ProxyRoutingRule & {
+  const proxyRoutes: (ProxyRoute & {
     upstream: string
     url: URL
-  })[] = config.rules
-    .filter((rule) => rule.rule === 'proxy')
-    .map((proxyRule: ProxyRoutingRule, index) => {
+  })[] = config.routes
+    .filter((route) => route.type === 'proxy')
+    .map((proxyRoute: ProxyRoute, index) => {
       return {
         upstream: `proxy-${index}`,
-        url: new URL(proxyRule.target),
-        ...proxyRule,
+        url: new URL(proxyRoute.target),
+        ...proxyRoute,
       }
     })
 
@@ -133,39 +135,48 @@ const staticGen = async (contentOutput?: string, nginxFile?: string, serverName?
     }
   }
 
-  proxyRules.forEach((proxyRule) => {
-    appendBlock(`upstream ${proxyRule.upstream} {`, '}', () => {
-      appendConfig(`server ${proxyRule.url.hostname}${proxyRule.url.port ? `:${proxyRule.url.port}` : ''};`)
+  proxyRoutes.forEach((proxyRoute) => {
+    appendBlock(`upstream ${proxyRoute.upstream} {`, '}', () => {
+      appendConfig(`server ${proxyRoute.url.hostname}${proxyRoute.url.port ? `:${proxyRoute.url.port}` : ''};`)
     })
   })
 
   appendBlock('server {', '}', () => {
-    if (serverName || staticGenConfig.nginxServerName) {
-      appendConfig(`server_name "${serverName || staticGenConfig.nginxServerName}";\n`)
+    if (staticGenConfig.nginxServerName) {
+      appendConfig(`server_name "${staticGenConfig.nginxServerName}";\n`)
     }
 
     if (staticGenConfig.nginxExtraConfig) {
       writeExtraConfig(staticGenConfig.nginxExtraConfig)
     }
 
-    appendConfig(`root ${output};\n`)
+    appendConfig(`root ${staticGenConfig.contentOutput};\n`)
 
-    proxyRules.forEach((proxyRule) => {
-      const matchers = buildMatcher(proxyRule)
+    proxyRoutes.forEach((proxyRoute) => {
+      const matchers = buildMatcher(proxyRoute)
       matchers.forEach((matcher) => {
         appendBlock(`${matcherToNginx(matcher)} {`, '}', () => {
-          appendConfig(`proxy_pass ${proxyRule.url.protocol}//${proxyRule.upstream};`)
+          appendConfig(`proxy_pass ${proxyRoute.url.protocol}//${proxyRoute.upstream};`)
         })
       })
     })
 
-    config.rules.forEach(async (rule) => {
-      const matchers = buildMatcher(rule)
-      switch (rule.rule) {
+    config.routes.forEach(async (route) => {
+      const matchers = buildMatcher(route)
+      switch (route.type) {
         case 'asset':
         case 'asset-proxy':
           matchers.forEach((matcher) => {
             appendBlock(`${matcherToNginx(matcher)} {`, '}', () => {
+              if (route.nginxExtraConfig) {
+                writeExtraConfig(route.nginxExtraConfig)
+              }
+              if (route.nginxExpires) {
+                appendConfig(`expires ${route.nginxExpires};`)
+              }
+              if (route.nginxCacheControlPublic) {
+                appendConfig('add_header Cache-Control "public";')
+              }
               appendConfig('try_files $uri =404;')
             })
           })
@@ -176,18 +187,23 @@ const staticGen = async (contentOutput?: string, nginxFile?: string, serverName?
     })
 
     for (const [urlStr, entry] of entries) {
-      const fileName = getFileName(output, urlStr, '.html')
+      const fileName = getFileName(staticGenConfig.contentOutput, urlStr, '.html')
       let { content } = entry
-      if (staticGenConfig.pageCleanUp) {
-        staticGenConfig.pageCleanUp.forEach(([regex, replacement]) => {
-          content = Buffer.from(content.toString().replace(new RegExp(regex), replacement))
+      if (staticGenConfig.pageReplace) {
+        console.log(`[static-site] applying ${staticGenConfig.pageReplace.length} replacements`)
+        staticGenConfig.pageReplace.forEach(([regex, replacement]) => {
+          if (content.toString().match(new RegExp(regex))) {
+            content = Buffer.from(content.toString().replace(new RegExp(regex), replacement))
+          } else {
+            console.log(`[static-site] no matches: ${regex}`)
+          }
         })
       }
-      outputFile(output, fileName, content)
+      outputFile(staticGenConfig.contentOutput, fileName, content)
       const url = new URL(urlStr)
       const { pathname, searchParams } = url
       if (searchParams.toString().length > 0) {
-        console.warn('cannot route URLs with search query in nginx config', urlStr)
+        console.warn('[static-site] cannot route URLs with search query in nginx config', urlStr)
       } else {
         appendBlock(`location ${pathname} {`, '}', () => {
           appendConfig('try_files $uri.html =404;')
@@ -197,19 +213,16 @@ const staticGen = async (contentOutput?: string, nginxFile?: string, serverName?
 
     const assetEntries = cache.listAssetEntries()
     for (const [urlStr, entry] of assetEntries) {
-      console.log('entry', urlStr)
-      const fileName = getFileName(output, urlStr)
-      outputFile(output, fileName, entry.content)
+      const fileName = getFileName(staticGenConfig.contentOutput, urlStr)
+      outputFile(staticGenConfig.contentOutput, fileName, entry.content)
     }
   })
 
-  const configFileOutput = nginxFile || staticGenConfig.nginxConfigOutputFile
-
-  if (configFileOutput) {
-    console.log('writing nginx config into', configFileOutput)
-    fs.writeFileSync(configFileOutput, nginxConfig)
+  if (staticGenConfig.nginxConfigFile) {
+    console.log('[static-site] writing nginx config into', staticGenConfig.nginxConfigFile)
+    fs.writeFileSync(staticGenConfig.nginxConfigFile, nginxConfig)
   } else {
-    console.log('nginx config:')
+    console.log('[static-site] nginx config:\n')
     console.log(nginxConfig)
   }
 }

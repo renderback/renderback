@@ -6,19 +6,13 @@ const { page: pageConfig } = config
 async function renderPage(page: Page): Promise<string> {
   try {
     // networkidle0 waits for the network to be idle (no requests for 500ms).
-    // The page's JS has likely produced markup by this point, but wait longer
-    // if your site lazy loads, etc.
-    await page.waitForSelector(pageConfig.waitSelector) // ensure #posts exists in the DOM.
-    await page.evaluate(() => {
-      console.log(
-        'Rendered title',
-        // eslint-disable-next-line no-undef
-        document.head.querySelector('title').innerText
-      )
-    })
+    console.log(`[render-page] wait for selector: ${pageConfig.waitSelector}`)
+    await page.waitForSelector(pageConfig.waitSelector)
   } catch (err) {
-    console.error(err)
-    throw new Error(`Wait for selector (${pageConfig.waitSelector}) timed out:\n${await page.content()}`)
+    const content = await page.content()
+    console.log(`[render-page] page content:\n`, content)
+    console.error(`[render-page] wait for selector (${pageConfig.waitSelector}) timed-out`, err)
+    throw new Error(`Wait for selector (${pageConfig.waitSelector}) timed out`)
   }
 
   return /* await */ page.content()

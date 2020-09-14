@@ -8,12 +8,13 @@ const isRequestBlacklisted = (request: Request): boolean => {
 }
 
 const createPage = async (browser: Browser): Promise<Page> => {
+  console.log('[create-page] creating page')
   const page = await browser.newPage()
   await page.setRequestInterception(true)
   if (config.log.pageConsole) {
     page.on('console', async (msg) => {
       if (msg.args().length > 0) {
-        console.log(`Page: console.${msg.type()}:`, ...(await Promise.all(msg.args().map((arg) => arg.jsonValue()))))
+        console.log(`[page] console.${msg.type()}:`, ...(await Promise.all(msg.args().map((arg) => arg.jsonValue()))))
       }
     })
   }
@@ -29,7 +30,7 @@ const createPage = async (browser: Browser): Promise<Page> => {
   }
   if (config.log.pageResponses) {
     page.on('response', (response) => {
-      console.log(`Page: response: ${response.status()} ${response.url()}`)
+      console.log(`[page] response: ${response.status()} ${response.url()}`)
     })
   }
   if (config.log.pageFailedRequests) {
@@ -40,22 +41,42 @@ const createPage = async (browser: Browser): Promise<Page> => {
         (!resourceRequest && !isRequestBlacklisted(request))
       ) {
         console.error(
-          `Page: request failed: ${request.resourceType()} ${request.failure().errorText} ${request.url()}`,
+          `[page] request failed: ${request.resourceType()} ${request.failure().errorText} ${request.url()}`,
           request.failure()
         )
       }
     })
   }
-  page.on('request', (request) => {
-    if (pageConfig.abortResourceRequests && ['image', 'stylesheet', 'font'].indexOf(request.resourceType()) !== -1) {
-      request.abort()
-    } else if (isRequestBlacklisted(request)) {
-      console.log('Blacklisting request:', request.url())
-      request.abort()
-    } else {
-      request.continue()
-    }
-  })
+  const resourcesToAbort = ['image', 'stylesheet', 'font']
+
+  if (pageConfig.abortResourceRequests) {
+    console.log(`[create-page] will abort resource requests: ${resourcesToAbort}`)
+    page.on('request', (request) => {
+      if (resourcesToAbort.indexOf(request.resourceType()) !== -1) {
+        if (config.log.pageAbortedRequests) {
+          console.log(`[page] request aborted - type==${request.resourceType()}: ${request.url()}`)
+        }
+        request.abort().catch(() => Promise.resolve())
+      } else {
+        request.continue().catch(() => Promise.resolve())
+      }
+    })
+  } else {
+    console.log(`[create-page] will NOT abort resource requests`)
+  }
+  if (pageConfig.requestBlacklist.length > 0) {
+    console.log(`[create-page] will abort blacklisted requests: ${pageConfig.requestBlacklist}`)
+    page.on('request', (request) => {
+      if (isRequestBlacklisted(request)) {
+        if (config.log.pageAbortedRequests) {
+          console.log(`[page] request aborted - blacklist: ${request.url()}`)
+        }
+        request.abort().catch(() => Promise.resolve())
+      } else {
+        request.continue().catch(() => Promise.resolve())
+      }
+    })
+  }
 
   return page
 }
