@@ -5,7 +5,7 @@ USE_GREENLOCK=0
 if [[ $GREENLOCK == "1" ]]; then
   USE_GREENLOCK=1
 fi
-STAGING=""
+STAGING=0
 
 if [[ $USE_GREENLOCK -eq 1 ]]; then
   echo "GREENLOCK_SUBJECT: ${GREENLOCK_SUBJECT}"
@@ -25,7 +25,7 @@ if [[ $USE_GREENLOCK -eq 1 ]]; then
   echo "greenlock alt names: ${GREENLOCK_ALT_NAMES}"
   if [[ "${GREENLOCK_STAGING}" == "1" ]]; then
     echo "will use fake certificates"
-    STAGING="-- --staging"
+    STAGING=1
   fi
   if [[ ! -f .greenlockrc ]]; then
     npx greenlock init --config-dir ./greenlock.d --maintainer-email "${GREENLOCK_MAINTAINER}"
@@ -36,4 +36,12 @@ else
   echo "will not use greenlock"
 fi
 
-node /usr/local/lib/node_modules/spa-ssr-proxy/dist/server.js "${STAGING}" start
+CMD="node /usr/local/lib/node_modules/spa-ssr-proxy/dist/server.js"
+
+if [[ $STAGING -eq 1 ]]; then
+  CMD+=" --staging"
+fi
+CMD+=" start"
+CMD+=" $*"
+echo "${CMD}"
+$CMD

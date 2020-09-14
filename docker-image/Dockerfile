@@ -15,6 +15,7 @@ EXPOSE 80
 EXPOSE 443
 ENV HTTP_PORT 80
 ENV BROWSER_EXECUTABLE "/usr/bin/google-chrome-stable"
+COPY --chown=node:node run.sh run.sh
 
 RUN npm install -g --production spa-ssr-proxy@0.1.0
 

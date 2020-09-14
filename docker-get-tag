@@ -19,7 +19,7 @@ fi
 USER_NAME=yurique
 IMAGE_NAME=spa-ssr-proxy
 
-IMAGE="ghcr.io/${USER_NAME}/${IMAGE_NAME}"
+IMAGE="${USER_NAME}/${IMAGE_NAME}"
 echo "${IMAGE}:$VERSION"
 if [[ $IS_SHA_VERSION -eq 0 ]]; then
   echo "${IMAGE}:latest"
