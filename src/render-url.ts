@@ -1,4 +1,4 @@
-import { green, yellow } from 'chalk'
+import { yellow } from 'chalk'
 import config from './config'
 import createPage from './create-page'
 import renderPage from './render-page'
@@ -9,7 +9,7 @@ import { renderTimeMetric } from './metrics'
 const renderUrl = async (url: string): Promise<CacheEntry & { ttRenderMs?: number }> => {
   const maybeCached = cache.get(url)
   if (maybeCached) {
-    return maybeCached
+    return { ...maybeCached }
   }
   const browser = await createBrowser()
   const start = Date.now()
@@ -19,7 +19,7 @@ const renderUrl = async (url: string): Promise<CacheEntry & { ttRenderMs?: numbe
     console.log(yellow(`[render-url] navigating to: ${url}`))
   }
   await page.goto(url, { waitUntil: 'networkidle0' })
-  const html = await renderPage(page)
+  const [status, html] = await renderPage(page)
   await page.close()
   const ttRenderMs = Date.now() - start
   timerHandle()
@@ -27,7 +27,7 @@ const renderUrl = async (url: string): Promise<CacheEntry & { ttRenderMs?: numbe
     console.info(yellow(`[render-url] ${url}: ${ttRenderMs}ms.`))
   }
 
-  const entry = cache.set(url, html)
+  const entry = cache.set(url, html, status)
   return { ttRenderMs, ...entry }
 }
 

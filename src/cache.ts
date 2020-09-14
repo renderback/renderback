@@ -4,6 +4,7 @@ import config, { runtimeConfig } from './config'
 export interface CacheEntry {
   content: Buffer
   etag: string
+  status: number
 }
 
 export class Cache {
@@ -32,10 +33,11 @@ export class Cache {
     return undefined
   }
 
-  set(url: string, content: string): CacheEntry {
+  set(url: string, content: string, status: number): CacheEntry {
     const entry = {
       content: Buffer.from(content),
       etag: etag(content),
+      status,
     }
     if (this.enabled || runtimeConfig.cacheEverything) {
       this.cache.set(url, entry)
@@ -43,10 +45,11 @@ export class Cache {
     return entry
   }
 
-  setAsset(url: string, buffer: Buffer): CacheEntry {
+  setAsset(url: string, buffer: Buffer, status: number): CacheEntry {
     const entry = {
       content: buffer,
       etag: etag(buffer),
+      status,
     }
     if (this.enabled || runtimeConfig.cacheEverything) {
       this.assetsCache.set(url, entry)

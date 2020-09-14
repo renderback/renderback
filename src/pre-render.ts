@@ -1,4 +1,4 @@
-import { gray, yellow } from 'chalk'
+import { yellow } from 'chalk'
 import createPage from './create-page'
 import renderPage from './render-page'
 import cache from './cache'
@@ -23,13 +23,13 @@ const preRender = async (): Promise<void> => {
     console.log(`[pre-render] navigating to: ${yellow(`${target}/`)}`)
   }
   await page.goto(`${target}/`, { waitUntil: 'networkidle0' })
-  const html = await renderPage(page)
+  const [status, html] = await renderPage(page)
   timerHandle()
   const ttRenderMs = Date.now() - start
   if (config.log.renderTime) {
     console.info(`[pre-render] rendered ${target}/: ${yellow(`${ttRenderMs}ms`)}`)
   }
-  cache.set(`${target}/`, html)
+  cache.set(`${target}/`, html, status)
 
   const processPath = async (path: string) => {
     const url = `${target}${path}`
@@ -56,13 +56,13 @@ const preRender = async (): Promise<void> => {
       url
     )
 
-    const pathHtml = await renderPage(page)
+    const [pathStatus, pathHtml] = await renderPage(page)
     pathTimerHandle()
     const pathRenderMs = Date.now() - pathStart
     if (config.log.renderTime) {
       console.info(`[pre-render] rendered ${url}: ${yellow(`${pathRenderMs}ms`)}`)
     }
-    cache.set(url, pathHtml)
+    cache.set(url, pathHtml, pathStatus)
   }
 
   const processPaths = async (paths: string[]) => {

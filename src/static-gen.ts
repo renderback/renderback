@@ -3,7 +3,7 @@ import path from 'path'
 import prettyBytes from 'pretty-bytes'
 import { cyan, green, blue, yellow, red } from 'chalk'
 import preRender from './pre-render'
-import config, { ProxyRoute, Route, runtimeConfig } from './config'
+import config, { envConfig, ProxyRoute, Route, runtimeConfig } from './config'
 import cache from './cache'
 import { buildMatcher } from './util'
 import { copyDirRecursiveSync } from './copy-dir'
@@ -207,6 +207,34 @@ const staticGen = async (): Promise<void> => {
       } else {
         appendBlock(`location ${pathname} {`, '}', () => {
           appendConfig('try_files $uri.html =404;')
+        })
+      }
+    }
+
+    if (staticGenConfig.notFoundPage) {
+      const notFoundPage = cache.get(`http://${envConfig.hostname}:${config.httpPort}${staticGenConfig.notFoundPage}`)
+      if (!notFoundPage) {
+        console.warn(
+          red(
+            `not configuring a Not Found page: ${staticGenConfig.notFoundPage} was not rendered (is it listed in pre-render?)`
+          )
+        )
+      } else {
+        appendConfig(`error_page 404 ${staticGenConfig.notFoundPage};`)
+      }
+    }
+
+    if (staticGenConfig.errorPage) {
+      const errorPage = cache.get(`http://${envConfig.hostname}:${config.httpPort}${staticGenConfig.errorPage}`)
+      if (!errorPage) {
+        console.warn(
+          red(
+            `not configuring an error page: ${staticGenConfig.errorPage} was not rendered (is it listed in pre-render?)`
+          )
+        )
+      } else {
+        staticGenConfig.errorCodes.forEach((errorCode) => {
+          appendConfig(`error_page ${errorCode} ${staticGenConfig.errorPage};`)
         })
       }
     }

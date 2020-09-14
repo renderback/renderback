@@ -21,7 +21,7 @@ export const copyDirRecursiveSync = (source: string, target: string): void => {
   let files = []
 
   // check if folder needs to be created or integrated
-  const targetFolder = path.join(target, path.basename(source))
+  const targetFolder = target
   if (!fs.existsSync(targetFolder)) {
     fs.mkdirSync(targetFolder)
   }

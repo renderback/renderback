@@ -25,10 +25,15 @@ export interface StaticSiteConfig {
   nginxServerName?: string
   pageReplace?: [[string, string]]
   nginxExtraConfig?: any
+  notFoundPage?: string
+  errorCodes: number[]
+  errorPage?: string
 }
 
 export interface PageConfig {
   waitSelector: string
+  statusCodeSelector?: string
+  statusCodeFunction?: string
   preNavigationScript?: string
   navigateFunction: string
   abortResourceRequests: boolean
@@ -126,6 +131,16 @@ const defaultConfig: Config = {
   preRender: false,
   preRenderPaths: [],
   adminAccessKey: '',
+  page: {
+    waitSelector: 'title[data-status]',
+    preNavigationScript: "document.head.querySelector('title').removeAttribute('data-status')",
+    statusCodeSelector: 'title[data-status]',
+    statusCodeFunction: '(e) => e.dataset.status',
+    // eslint-disable-next-line no-template-curly-in-string
+    navigateFunction: '(url) => window.location.href = url',
+    abortResourceRequests: true,
+    requestBlacklist: [],
+  },
   log: {
     navigation: false,
     routeMatch: 2,
@@ -135,16 +150,10 @@ const defaultConfig: Config = {
     pageAbortedRequests: false,
     pageFailedRequests: true,
   },
-  page: {
-    waitSelector: 'title[data-status]',
-    preNavigationScript: "document.head.querySelector('title').removeAttribute('data-status')",
-    // eslint-disable-next-line no-template-curly-in-string
-    navigateFunction: '(url) => window.location.href = url',
-    abortResourceRequests: true,
-    requestBlacklist: [],
-  },
   routes: [],
-  static: {},
+  static: {
+    errorCodes: [500, 502],
+  },
 }
 
 export const { argv } = yargsRaw
@@ -241,6 +250,17 @@ export const { argv } = yargsRaw
       description: 'CSS selector to wait on when rendering pages (default "title[data-status]")',
       demandOption: false,
     },
+    'page-status-code-selector': {
+      type: 'string',
+      description: 'CSS selector of the element to extract the status code from (default "title[data-status]")',
+      demandOption: false,
+    },
+    'page-status-code-function': {
+      type: 'string',
+      description:
+        'JavaScript function to extract the status code from the element (default "(e) => e.dataset.status")',
+      demandOption: false,
+    },
     'page-navigate-function': {
       type: 'string',
       description: 'JavaScript function body to be used to navigate to pages (when pre-rendering)',
@@ -275,6 +295,21 @@ export const { argv } = yargsRaw
     'static-nginx-server-name': {
       type: 'string',
       description: 'server_name for the nginx config file (static site)',
+      demandOption: false,
+    },
+    'static-not-found-page': {
+      type: 'string',
+      description: 'URL of the page to use as a Not Found page (static site)',
+      demandOption: false,
+    },
+    'static-error-page': {
+      type: 'string',
+      description: 'URL of the page to use as an error page (static site)',
+      demandOption: false,
+    },
+    'static-error-codes': {
+      type: 'string',
+      description: 'A list of status codes for which to configure the error page (static site)',
       demandOption: false,
     },
     'origin-base-url': {
@@ -331,6 +366,10 @@ config.log.pageFailedRequests =
   argv['log-page-failed-requests'] || envBoolean('LOG_PAGE_FAILED_REQUESTS') || config.log.pageFailedRequests
 
 config.page.waitSelector = argv['page-wait-selector'] || envString('PAGE_WAIT_SELECTOR') || config.page.waitSelector
+config.page.statusCodeSelector =
+  argv['page-status-code-selector'] || envString('PAGE_STATUS_CODE_SELECTOR') || config.page.statusCodeSelector
+config.page.statusCodeFunction =
+  argv['page-status-code-function'] || envString('PAGE_STATUS_CODE_FUNCTION') || config.page.statusCodeFunction
 config.page.preNavigationScript =
   argv['page-pre-navigation-script'] || envString('PAGE_PRE_NAVIGATION_SCRIPT') || config.page.preNavigationScript
 config.page.navigateFunction =
@@ -352,6 +391,12 @@ config.static.nginxConfigFile =
   argv['static-nginx-config-file'] || envString('STATIC_NGINX_CONFIG_FILE') || config.static.nginxConfigFile
 config.static.nginxServerName =
   argv['static-nginx-server-name'] || envString('STATIC_NGINX_SERVER_NAME') || config.static.nginxServerName
+config.static.notFoundPage =
+  argv['static-not-found-page'] || envString('STATIC_NOT_FOUND_PAGE') || config.static.notFoundPage
+config.static.errorPage = argv['static-error-page'] || envString('STATIC_ERROR_PAGE') || config.static.errorPage
+config.static.errorCodes =
+  (argv['static-error-codes'] ? argv['static-error-codes'].map((s) => Number(s)) : undefined) ||
+  config.static.errorCodes
 
 export const envConfig: EnvConfig = {
   greenlock: envBoolean('GREENLOCK'),

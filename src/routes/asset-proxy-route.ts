@@ -18,7 +18,7 @@ export const assetProxyRoute = async (
       proxyResData: any,
       userReq: Request
     ): Buffer | string | Promise<Buffer | string> => {
-      cache.setAsset(`${userReq.protocol}://${userReq.hostname}${userReq.url}`, proxyResData)
+      cache.setAsset(`${userReq.protocol}://${userReq.hostname}${userReq.url}`, proxyResData, proxyRes.statusCode)
       return proxyResData
     }
     return proxy(route.target, {

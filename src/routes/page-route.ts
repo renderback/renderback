@@ -16,7 +16,7 @@ export const pageRoute = async (route: PageRoute | PageProxyRoute, req: Request,
     )
     process.exit(1)
   }
-  const { content, etag, ttRenderMs } = await renderUrl(
+  const { content, etag, ttRenderMs, status } = await renderUrl(
     route.type === 'page-proxy'
       ? `${route.target}${req.originalUrl}`
       : `http://${envConfig.hostname}:${config.httpPort}${req.originalUrl}`
@@ -26,6 +26,6 @@ export const pageRoute = async (route: PageRoute | PageProxyRoute, req: Request,
     res.set('Server-Timing', `Prerender;dur=${ttRenderMs};desc="Headless render time (ms)"`)
   }
   res.set('etag', etag)
-  res.status(200).send(content)
+  res.status(status).send(content)
   return res
 }
