@@ -12,6 +12,8 @@ export interface Config {
   enableCache: boolean
   adminAccessKey: string
   preRender: boolean
+  preRenderScrape: boolean
+  preRenderScrapeDepth?: number
   log: LogConfig
   page: PageConfig
   routes: Route[]
@@ -129,6 +131,7 @@ const defaultConfig: Config = {
   httpPort: 40080,
   enableCache: true,
   preRender: false,
+  preRenderScrape: false,
   preRenderPaths: [],
   adminAccessKey: '',
   page: {
@@ -193,6 +196,16 @@ export const { argv } = yargsRaw
     'pre-render': {
       boolean: true,
       description: 'Pre-render the pages',
+      demandOption: false,
+    },
+    'pre-render-scrape': {
+      boolean: true,
+      description: 'Scrape the pages to pre-render',
+      demandOption: false,
+    },
+    'pre-render-scrape-depth': {
+      type: 'number',
+      description: 'Scrape depth',
       demandOption: false,
     },
     'pre-render-paths': {
@@ -352,6 +365,10 @@ config.userAgent = argv['user-agent'] || envString('USER_AGENT') || config.userA
 config.httpPort = argv['http-port'] || envNumber('HTTP_PORT') || config.httpPort
 config.adminAccessKey = envString('ADMIN_ACCESS_KEY') || config.adminAccessKey
 config.enableCache = argv['enable-cache'] || envBoolean('ENABLE_CACHE') || config.enableCache
+config.preRender = argv['pre-render'] || envBoolean('PRE_RENDER') || config.preRender
+config.preRenderScrape = argv['pre-render-scrape'] || envBoolean('PRE_RENDER_SCRAPE') || config.preRenderScrape
+config.preRenderScrapeDepth =
+  argv['pre-render-scrape-depth'] || envNumber('PRE_RENDER_SCRAPE_DEPTH') || config.preRenderScrapeDepth
 
 config.log.navigation = argv['log-navigation'] || envBoolean('LOG_NAVIGATION') || config.log.navigation
 config.log.selfRequests = argv['log-self-requests'] || envBoolean('LOG_SELF_REQUESTS') || config.log.selfRequests
