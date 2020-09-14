@@ -1,4 +1,5 @@
 import { Page } from 'puppeteer-core'
+import { gray, red } from 'chalk'
 import config from './config'
 
 const { page: pageConfig } = config
@@ -10,8 +11,8 @@ async function renderPage(page: Page): Promise<string> {
     await page.waitForSelector(pageConfig.waitSelector)
   } catch (err) {
     const content = await page.content()
-    console.log(`[render-page] page content:\n`, content)
-    console.error(`[render-page] wait for selector (${pageConfig.waitSelector}) timed-out`, err)
+    console.log(gray(`[render-page] page content:\n${content}`))
+    console.error(red(`[render-page] wait for selector (${pageConfig.waitSelector}) timed-out`), err)
     throw new Error(`Wait for selector (${pageConfig.waitSelector}) timed out`)
   }
 

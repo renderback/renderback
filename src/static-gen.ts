@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import prettyBytes from 'pretty-bytes'
+import { cyan, green, blue, yellow, red } from 'chalk'
 import preRender from './pre-render'
 import config, { ProxyRoute, Route, runtimeConfig } from './config'
 import cache from './cache'
@@ -32,7 +33,7 @@ const getFileName = (outputDir: string, urlString: string, fileNameSuffix?: stri
 }
 
 const outputFile = (outputDir: string, fileName: string, content: Buffer): void => {
-  console.log('[static-site] writing file:', `${outputDir}${fileName}`, prettyBytes(content.length))
+  console.log(`[static-site] writing file -> ${outputDir}${yellow(fileName)} (${cyan(prettyBytes(content.length))})`)
   fs.writeFileSync(`${outputDir}${fileName}`, content)
 }
 
@@ -53,14 +54,14 @@ const staticGen = async (): Promise<void> => {
     config.page.abortResourceRequests = false
   }
   if (!preRenderEnabled) {
-    console.error('[static-site] pre-render is not enabled')
+    console.error(red('[static-site] pre-render is not enabled'))
     process.exit(1)
   }
   if (!staticGenConfig.contentOutput) {
-    console.error('content output dir is not configured')
+    console.error(red('content output dir is not configured'))
     process.exit(1)
   }
-  console.log(`[static-site] generating...`)
+  console.log(green(`[static-site] generating static site into ${staticGenConfig.contentOutput}...`))
   console.log(`[static-site] pre-rendering...`)
   await preRender()
 
@@ -69,9 +70,8 @@ const staticGen = async (): Promise<void> => {
   const processRoute = async (route: Route) => {
     switch (route.type) {
       case 'asset':
-        console.log(`[static-site] copying assets: ${route.dir} -> ${staticGenConfig.contentOutput}`)
+        console.log(`[static-site] copying assets: ${yellow(route.dir)} -> ${yellow(staticGenConfig.contentOutput)}`)
         copyDirRecursiveSync(route.dir, staticGenConfig.contentOutput)
-        console.log('[static-site] done copying')
         break
 
       default:
@@ -195,7 +195,7 @@ const staticGen = async (): Promise<void> => {
           if (content.toString().match(new RegExp(regex))) {
             content = Buffer.from(content.toString().replace(new RegExp(regex), replacement))
           } else {
-            console.log(`[static-site] no matches: ${regex}`)
+            console.log(red(`[static-site] no matches: ${regex}`))
           }
         })
       }
@@ -219,11 +219,11 @@ const staticGen = async (): Promise<void> => {
   })
 
   if (staticGenConfig.nginxConfigFile) {
-    console.log('[static-site] writing nginx config into', staticGenConfig.nginxConfigFile)
+    console.log(`[static-site] writing nginx config into ${yellow(staticGenConfig.nginxConfigFile)}`)
     fs.writeFileSync(staticGenConfig.nginxConfigFile, nginxConfig)
   } else {
     console.log('[static-site] nginx config:\n')
-    console.log(nginxConfig)
+    console.log(blue(nginxConfig))
   }
 }
 

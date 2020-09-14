@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import prettyBytes from 'pretty-bytes'
+import { cyan } from 'chalk'
 
 export const copyFileSync = (source: string, target: string): void => {
   let targetFile = target
@@ -12,7 +13,7 @@ export const copyFileSync = (source: string, target: string): void => {
     }
   }
 
-  console.log(`[static-site] copying file: ${source} -> ${targetFile} (${prettyBytes(fs.statSync(source).size)})`)
+  console.log(`[static-site] writing -> ${targetFile} (${cyan(prettyBytes(fs.statSync(source).size))}) (copy assets)`)
   fs.copyFileSync(source, targetFile)
 }
 

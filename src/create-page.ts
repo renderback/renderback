@@ -1,4 +1,5 @@
 import { Browser, Page, Request } from 'puppeteer-core'
+import { magenta, gray, red } from 'chalk'
 import config from './config'
 
 const { page: pageConfig } = config
@@ -26,11 +27,11 @@ const createPage = async (browser: Browser): Promise<Page> => {
   }
 
   if (config.log.pageErrors) {
-    page.on('pageerror', ({ message }) => console.log('Page: error:', message))
+    page.on('pageerror', ({ message }) => console.log(red('[page] error:'), message))
   }
   if (config.log.pageResponses) {
     page.on('response', (response) => {
-      console.log(`[page] response: ${response.status()} ${response.url()}`)
+      console.log(gray(`[page] response: ${response.status()} ${response.url()}`))
     })
   }
   if (config.log.pageFailedRequests) {
@@ -41,7 +42,7 @@ const createPage = async (browser: Browser): Promise<Page> => {
         (!resourceRequest && !isRequestBlacklisted(request))
       ) {
         console.error(
-          `[page] request failed: ${request.resourceType()} ${request.failure().errorText} ${request.url()}`,
+          red(`[page] request failed: ${request.resourceType()} ${request.failure().errorText} ${request.url()}`),
           request.failure()
         )
       }
@@ -50,11 +51,11 @@ const createPage = async (browser: Browser): Promise<Page> => {
   const resourcesToAbort = ['image', 'stylesheet', 'font']
 
   if (pageConfig.abortResourceRequests) {
-    console.log(`[create-page] will abort resource requests: ${resourcesToAbort}`)
+    console.log(magenta(`[create-page] will abort resource requests: ${resourcesToAbort}`))
     page.on('request', (request) => {
       if (resourcesToAbort.indexOf(request.resourceType()) !== -1) {
         if (config.log.pageAbortedRequests) {
-          console.log(`[page] request aborted - type==${request.resourceType()}: ${request.url()}`)
+          console.log(gray(`[page] request aborted - type==${request.resourceType()}: ${request.url()}`))
         }
         request.abort().catch(() => Promise.resolve())
       } else {
@@ -62,14 +63,14 @@ const createPage = async (browser: Browser): Promise<Page> => {
       }
     })
   } else {
-    console.log(`[create-page] will NOT abort resource requests`)
+    console.log(magenta(`[create-page] will NOT abort resource requests`))
   }
   if (pageConfig.requestBlacklist.length > 0) {
-    console.log(`[create-page] will abort blacklisted requests: ${pageConfig.requestBlacklist}`)
+    console.log(magenta(`[create-page] will abort blacklisted requests: ${pageConfig.requestBlacklist}`))
     page.on('request', (request) => {
       if (isRequestBlacklisted(request)) {
         if (config.log.pageAbortedRequests) {
-          console.log(`[page] request aborted - blacklist: ${request.url()}`)
+          console.log(gray(`[page] request aborted - blacklist: ${request.url()}`))
         }
         request.abort().catch(() => Promise.resolve())
       } else {

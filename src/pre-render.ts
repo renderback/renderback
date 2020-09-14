@@ -1,3 +1,4 @@
+import { gray, yellow } from 'chalk'
 import createPage from './create-page'
 import renderPage from './render-page'
 import cache from './cache'
@@ -19,14 +20,14 @@ const preRender = async (): Promise<void> => {
   const start = Date.now()
   const timerHandle = renderTimeMetric.startTimer({ url: `${target}/` })
   if (config.log.navigation) {
-    console.log(`[pre-render] navigating to:`, `${target}/`)
+    console.log(`[pre-render] navigating to: ${yellow(`${target}/`)}`)
   }
   await page.goto(`${target}/`, { waitUntil: 'networkidle0' })
   const html = await renderPage(page)
   timerHandle()
   const ttRenderMs = Date.now() - start
   if (config.log.renderTime) {
-    console.info(`[pre-render] rendered ${target}/: ${ttRenderMs}ms.`)
+    console.info(`[pre-render] rendered ${target}/: ${yellow(`${ttRenderMs}ms`)}`)
   }
   cache.set(`${target}/`, html)
 
@@ -44,7 +45,7 @@ const preRender = async (): Promise<void> => {
       }, pageConfig.preNavigationScript)
     }
     if (config.log.navigation) {
-      console.log(`[pre-render] navigating to: ${url} (${pageConfig.navigateFunction})`)
+      console.log(`[pre-render] navigating to: ${yellow(url)} (${pageConfig.navigateFunction})`)
     }
     await page.evaluate(
       (navigateFunction, navigateToURL) => {
@@ -59,7 +60,7 @@ const preRender = async (): Promise<void> => {
     pathTimerHandle()
     const pathRenderMs = Date.now() - pathStart
     if (config.log.renderTime) {
-      console.info(`[pre-render] rendered ${url}: ${pathRenderMs}ms.`)
+      console.info(`[pre-render] rendered ${url}: ${yellow(`${pathRenderMs}ms`)}`)
     }
     cache.set(url, pathHtml)
   }

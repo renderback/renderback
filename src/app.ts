@@ -3,6 +3,7 @@ import errorHandler from 'errorhandler'
 import path from 'path'
 import proxy from 'express-http-proxy'
 import promMid from 'express-prometheus-middleware'
+import { yellow, red, cyan } from 'chalk'
 import config, { Route } from './config'
 import cache from './cache'
 import preRender from './pre-render'
@@ -23,17 +24,17 @@ app.use(errorHandler())
 const shortRouteDescription = (route: Route): string => {
   switch (route.type) {
     case 'page':
-      return `${route.type} -> ${route.source}`
+      return `${yellow(route.type)} -> ${route.source}`
     case 'asset':
-      return `${route.type} -> ${route.dir}`
+      return `${yellow(route.type)} -> ${route.dir}`
     case 'proxy':
-      return `${route.type} -> ${route.target}`
+      return `${yellow(route.type)} -> ${route.target}`
     case 'asset-proxy':
-      return `${route.type} -> ${route.target}`
+      return `${yellow(route.type)} -> ${route.target}`
     case 'page-proxy':
-      return `${route.type} -> ${route.target}`
+      return `${yellow(route.type)} -> ${route.target}`
     case 'not-found':
-      return `${route.type}`
+      return `${yellow(route.type)}`
     default:
       return JSON.stringify(route)
   }
@@ -44,13 +45,13 @@ const logRoute = (url: string, route: Route) => {
     case 0:
       return
     case 1:
-      console.log(`[app] route match ${url} -- `, route.type)
+      console.log(`[app] route match ${cyan(url)} -- ${yellow(route.type)}`)
       break
     case 2:
-      console.log(`[app] route match ${url} -- ${shortRouteDescription(route)}`)
+      console.log(`[app] route match ${cyan(url)} -- ${shortRouteDescription(route)}`)
       break
     default:
-      console.log(`[app] route match ${url} -- `, JSON.stringify(route))
+      console.log(`[app] route match ${cyan(url)} -- ${JSON.stringify(route)}`)
   }
 }
 
@@ -62,7 +63,7 @@ app.post('/__ssr/admin/clear-cache', async (req, res) => {
       adminAccessKey === 'secret-access-key' ||
       adminAccessKey.trim() === ''
     ) {
-      console.error('Admin access key is not configured.')
+      console.error(red('Admin access key is not configured.'))
       return res.status(401).send(`Unauthorized.`)
     }
 
@@ -142,7 +143,7 @@ config.routes.forEach((route) => {
       break
 
     default:
-      console.error('[app] unrecognized route type', route)
+      console.error(red(`[app] unrecognized route type: ${JSON.stringify(route)}`))
       break
   }
 })
