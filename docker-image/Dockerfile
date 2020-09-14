@@ -13,9 +13,10 @@ RUN apt-get update \
 WORKDIR /home/node
 EXPOSE 80
 EXPOSE 443
+ENV HTTP_PORT 80
+ENV BROWSER_EXECUTABLE "/usr/bin/google-chrome-stable"
 
-RUN npm install -g --production spa-ssr-proxy@0.0.8
+RUN npm install -g --production spa-ssr-proxy@0.1.0
 
 USER node
 CMD ["run.sh"]
-CMD ["node", "/usr/local/lib/node_modules/spa-ssr-proxy/dist/server.js"]

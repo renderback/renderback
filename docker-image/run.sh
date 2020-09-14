@@ -36,4 +36,4 @@ else
   echo "will not use greenlock"
 fi
 
-yarn start "${STAGING}"
+node /usr/local/lib/node_modules/spa-ssr-proxy/dist/server.js "${STAGING}" start
