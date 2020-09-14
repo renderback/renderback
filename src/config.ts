@@ -308,7 +308,7 @@ export const { argv } = yargsRaw
       demandOption: false,
     },
     'static-error-codes': {
-      type: 'string',
+      type: 'array',
       description: 'A list of status codes for which to configure the error page (static site)',
       demandOption: false,
     },
