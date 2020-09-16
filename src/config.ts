@@ -2,7 +2,8 @@ import _ from 'lodash'
 import fs from 'fs'
 import os from 'os'
 import yargsRaw from 'yargs'
-import { envString, envNumber, envBoolean, envStringList } from './env-config'
+import { Options } from 'html-minifier'
+import { envString, envNumber, envBoolean, envStringList, envNumberList } from './env-config'
 
 export interface Config {
   browserExecutable?: string
@@ -11,48 +12,69 @@ export interface Config {
   httpPort: number
   enableCache: boolean
   adminAccessKey: string
-  preRender: boolean
-  preRenderScrape: boolean
-  preRenderScrapeDepth?: number
+  origins: string[]
+  pathifySingleParams: boolean
+  preRender?: PreRenderConfig
   log: LogConfig
   page: PageConfig
   routes: Route[]
-  preRenderPaths: []
   static?: StaticSiteConfig
+}
+
+export interface PreRenderConfig {
+  enabled: boolean
+  paths?: string[]
+  scrape?: boolean
+  scrapeDepth?: number
+  pause?: number
 }
 
 export interface StaticSiteConfig {
   contentOutput?: string
-  nginxConfigFile?: string
-  nginxServerName?: string
   pageReplace?: [[string, string]]
-  nginxExtraConfig?: any
+  pageReplaceAfterMinimize?: [[string, string]]
+  nginx?: StaticSiteNginxConfig
+  s3?: StaticSiteS3Config
+  minify?: Options
+}
+
+export interface StaticSiteNginxConfig {
+  configFile: string
+  serverName?: string
+  extraConfig?: unknown
   notFoundPage?: string
   errorCodes: number[]
   errorPage?: string
 }
 
+export interface StaticSiteS3Config {
+  uploadScript: string
+  bucketName: string
+  awsProfile: string
+}
+
 export interface PageConfig {
   waitSelector: string
-  statusCodeSelector?: string
-  statusCodeFunction?: string
+  statusCodeSelector: string
+  statusCodeFunction: string
   preNavigationScript?: string
-  navigateFunction: string
+  navigateFunction?: string
   abortResourceRequests: boolean
   requestBlacklist: string[]
 }
 
 export interface LogConfig {
-  navigation?: boolean
-  renderTime?: boolean
-  selfRequests?: boolean
-  routeMatch?: number // 0 -- disable
-  pageLocation?: boolean
-  pageErrors?: boolean
-  pageConsole?: boolean
-  pageResponses?: boolean
-  pageAbortedRequests?: boolean
-  pageFailedRequests?: boolean
+  navigation: boolean
+  renderTime: boolean
+  selfRequests: boolean
+  routeMatch: number // 0 -- disable
+  pageErrors: boolean
+  pageConsole: boolean
+  pageRequests: boolean
+  pageResponses: boolean
+  pageAbortedRequests: boolean
+  pageFailedRequests: boolean
+  cache: boolean
 }
 
 export interface ProxyRoute {
@@ -62,7 +84,7 @@ export interface ProxyRoute {
   regex?: string[]
   target: string
   modifyUrl?: string
-  nginxExtraConfig?: any
+  nginxExtraConfig?: unknown
 }
 
 export interface AssetRoute {
@@ -72,7 +94,7 @@ export interface AssetRoute {
   regex?: string[]
   dir: string
   maxAge?: number // default 31557600000
-  nginxExtraConfig?: any
+  nginxExtraConfig?: unknown
   nginxExpires?: string
   nginxCacheControlPublic?: boolean
 }
@@ -83,7 +105,7 @@ export interface AssetProxyRoute {
   path?: string[]
   regex?: string[]
   target: string
-  nginxExtraConfig?: any
+  nginxExtraConfig?: unknown
   nginxExpires?: string
   nginxCacheControlPublic?: boolean
 }
@@ -94,7 +116,7 @@ export interface PageRoute {
   path?: string[]
   regex?: string[]
   source: string
-  nginxExtraConfig?: any
+  nginxExtraConfig?: unknown
 }
 
 export interface PageProxyRoute {
@@ -103,7 +125,7 @@ export interface PageProxyRoute {
   path?: string[]
   regex?: string[]
   target: string
-  nginxExtraConfig?: any
+  nginxExtraConfig?: unknown
 }
 
 export interface NotFoundRoute {
@@ -130,33 +152,32 @@ const defaultConfig: Config = {
   userAgent: 'ssr/proxy',
   httpPort: 40080,
   enableCache: true,
-  preRender: false,
-  preRenderScrape: false,
-  preRenderPaths: [],
   adminAccessKey: '',
+  origins: [],
+  pathifySingleParams: false,
   page: {
     waitSelector: 'title[data-status]',
     preNavigationScript: "document.head.querySelector('title').removeAttribute('data-status')",
     statusCodeSelector: 'title[data-status]',
     statusCodeFunction: '(e) => e.dataset.status',
     // eslint-disable-next-line no-template-curly-in-string
-    navigateFunction: '(url) => window.location.href = url',
     abortResourceRequests: true,
     requestBlacklist: [],
   },
   log: {
     navigation: false,
+    renderTime: true,
+    selfRequests: false,
     routeMatch: 2,
     pageErrors: true,
     pageConsole: false,
     pageResponses: false,
+    pageRequests: false,
     pageAbortedRequests: false,
     pageFailedRequests: true,
+    cache: false,
   },
   routes: [],
-  static: {
-    errorCodes: [500, 502],
-  },
 }
 
 export const { argv } = yargsRaw
@@ -193,6 +214,16 @@ export const { argv } = yargsRaw
       description: 'Enable the rendered pages cache',
       demandOption: false,
     },
+    origins: {
+      type: 'array',
+      description: 'Origins to consider part of the site (when scraping, rewriting links, etc)',
+      demandOption: false,
+    },
+    'pathify-single-params': {
+      boolean: true,
+      description: 'Replace ..path?param=value with ..path/param/value',
+      demandOption: false,
+    },
     'pre-render': {
       boolean: true,
       description: 'Pre-render the pages',
@@ -206,6 +237,11 @@ export const { argv } = yargsRaw
     'pre-render-scrape-depth': {
       type: 'number',
       description: 'Scrape depth',
+      demandOption: false,
+    },
+    'pre-render-pause': {
+      type: 'number',
+      description: 'Pause between pages (millis)',
       demandOption: false,
     },
     'pre-render-paths': {
@@ -243,6 +279,11 @@ export const { argv } = yargsRaw
       description: 'Log page console',
       demandOption: false,
     },
+    'log-page-requests': {
+      boolean: true,
+      description: 'Log page HTTP requests',
+      demandOption: false,
+    },
     'log-page-responses': {
       boolean: true,
       description: 'Log page HTTP responses',
@@ -256,6 +297,11 @@ export const { argv } = yargsRaw
     'log-page-failed-requests': {
       boolean: true,
       description: 'Log page failed HTTP requests',
+      demandOption: false,
+    },
+    'log-cache': {
+      boolean: true,
+      description: 'Log caching',
       demandOption: false,
     },
     'page-wait-selector': {
@@ -330,6 +376,21 @@ export const { argv } = yargsRaw
       description: 'Origin base URL (when using the default config)',
       demandOption: false,
     },
+    'static-s3-upload-script': {
+      type: 'string',
+      description: 'Path to the target file for s3 upload script (static site)',
+      demandOption: false,
+    },
+    'static-s3-bucket-name': {
+      type: 'string',
+      description: 'Bucket name to be used in the upload script (static site)',
+      demandOption: false,
+    },
+    'static-s3-aws-profile': {
+      type: 'string',
+      description: 'AWS profile to be used in the upload script (static site)',
+      demandOption: false,
+    },
   })
   .demandCommand(1, 1)
 
@@ -365,10 +426,23 @@ config.userAgent = argv['user-agent'] || envString('USER_AGENT') || config.userA
 config.httpPort = argv['http-port'] || envNumber('HTTP_PORT') || config.httpPort
 config.adminAccessKey = envString('ADMIN_ACCESS_KEY') || config.adminAccessKey
 config.enableCache = argv['enable-cache'] || envBoolean('ENABLE_CACHE') || config.enableCache
-config.preRender = argv['pre-render'] || envBoolean('PRE_RENDER') || config.preRender
-config.preRenderScrape = argv['pre-render-scrape'] || envBoolean('PRE_RENDER_SCRAPE') || config.preRenderScrape
-config.preRenderScrapeDepth =
-  argv['pre-render-scrape-depth'] || envNumber('PRE_RENDER_SCRAPE_DEPTH') || config.preRenderScrapeDepth
+config.origins =
+  (argv.origins ? argv.origins.map((s) => String(s)) : undefined) || envStringList('ORIGINS') || config.origins
+
+config.preRender = {
+  ...(config.preRender || {}),
+  ...{
+    enabled: argv['pre-render'] || envBoolean('PRE_RENDER') || config.preRender?.enabled,
+    paths:
+      (argv['pre-render-paths'] && argv['pre-render-paths'].map((s) => s as string)) ||
+      envStringList('PRE_RENDER_PATHS') ||
+      config.preRender?.paths,
+    scrape: argv['pre-render-scrape'] || envBoolean('PRE_RENDER_SCRAPE') || config.preRender?.scrape,
+    scrapeDepth:
+      argv['pre-render-scrape-depth'] || envNumber('PRE_RENDER_SCRAPE_DEPTH') || config.preRender?.scrapeDepth,
+    pause: argv['pre-render-pause'] || envNumber('PRE_RENDER_PAUSE') || config.preRender?.pause,
+  },
+}
 
 config.log.navigation = argv['log-navigation'] || envBoolean('LOG_NAVIGATION') || config.log.navigation
 config.log.selfRequests = argv['log-self-requests'] || envBoolean('LOG_SELF_REQUESTS') || config.log.selfRequests
@@ -377,10 +451,12 @@ config.log.routeMatch = argv['log-route-match'] || envNumber('LOG_ROUTE_MATCH') 
 config.log.pageErrors = argv['log-page-errors'] || envBoolean('LOG_PAGE_ERRORS') || config.log.pageErrors
 config.log.pageConsole = argv['log-page-console'] || envBoolean('LOG_PAGE_CONSOLE') || config.log.pageConsole
 config.log.pageResponses = argv['log-page-responses'] || envBoolean('LOG_PAGE_RESPONSES') || config.log.pageResponses
+config.log.pageRequests = argv['log-page-requests'] || envBoolean('LOG_PAGE_REQUESTS') || config.log.pageRequests
 config.log.pageAbortedRequests =
   argv['log-page-aborted-requests'] || envBoolean('LOG_PAGE_ABORTED_REQUESTS') || config.log.pageAbortedRequests
 config.log.pageFailedRequests =
   argv['log-page-failed-requests'] || envBoolean('LOG_PAGE_FAILED_REQUESTS') || config.log.pageFailedRequests
+config.log.cache = argv['log-cache'] || envBoolean('LOG_CACHE') || config.log.cache
 
 config.page.waitSelector = argv['page-wait-selector'] || envString('PAGE_WAIT_SELECTOR') || config.page.waitSelector
 config.page.statusCodeSelector =
@@ -404,22 +480,56 @@ config.page.requestBlacklist =
 
 config.static.contentOutput =
   argv['static-content-output'] || envString('STATIC_CONTENT_OUTPUT') || config.static.contentOutput
-config.static.nginxConfigFile =
-  argv['static-nginx-config-file'] || envString('STATIC_NGINX_CONFIG_FILE') || config.static.nginxConfigFile
-config.static.nginxServerName =
-  argv['static-nginx-server-name'] || envString('STATIC_NGINX_SERVER_NAME') || config.static.nginxServerName
-config.static.notFoundPage =
-  argv['static-not-found-page'] || envString('STATIC_NOT_FOUND_PAGE') || config.static.notFoundPage
-config.static.errorPage = argv['static-error-page'] || envString('STATIC_ERROR_PAGE') || config.static.errorPage
-config.static.errorCodes =
-  (argv['static-error-codes'] ? argv['static-error-codes'].map((s) => Number(s)) : undefined) ||
-  config.static.errorCodes
+
+config.pathifySingleParams =
+  argv['pathify-single-params'] || envBoolean('PATHIFY_SINGLE_PARAMS') || config.pathifySingleParams
+
+config.static = {
+  ...(config.static || {}),
+  ...{
+    nginx: {
+      ...(config.static?.nginx || {}),
+      ...{
+        configFile:
+          argv['static-nginx-config-file'] || envString('STATIC_NGINX_CONFIG_FILE') || config.static?.nginx?.configFile,
+        serverName:
+          argv['static-nginx-server-name'] || envString('STATIC_NGINX_SERVER_NAME') || config.static?.nginx?.serverName,
+        notFoundPage:
+          argv['static-not-found-page'] || envString('STATIC_NOT_FOUND_PAGE') || config.static?.nginx?.notFoundPage,
+        errorPage: argv['static-error-page'] || envString('STATIC_ERROR_PAGE') || config.static?.nginx?.errorPage,
+        errorCodes: (argv['static-error-codes'] ? argv['static-error-codes'].map((s) => Number(s)) : undefined) ||
+          envNumberList('STATIC_ERROR_CODES') ||
+          config.static?.nginx?.errorCodes || [500, 502],
+      },
+    },
+    s3: {
+      ...(config.static?.s3 || {}),
+      ...{
+        uploadScript:
+          argv['static-s3-upload-script'] || envString('STATIC_S3_UPLOAD_SCRIPT') || config.static?.s3?.uploadScript,
+        bucketName:
+          argv['static-s3-bucket-name'] || envString('STATIC_S3_BUCKET_NAME') || config.static?.s3?.bucketName,
+        awsProfile:
+          argv['static-s3-aws-profile'] || envString('STATIC_S3_AWS_PROFILE') || config.static?.s3?.awsProfile,
+      },
+    },
+  },
+}
+
+if (config.static && Object.entries(config.static.nginx || {}).length === 0) {
+  config.static.nginx = undefined
+}
+if (config.static && Object.entries(config.static.s3 || {}).length === 0) {
+  config.static.s3 = undefined
+}
 
 export const envConfig: EnvConfig = {
   greenlock: envBoolean('GREENLOCK'),
   greenlockMaintainer: envString('GREENLOCK_MAINTAINER'),
   hostname: os.hostname(),
 }
+
+config.origins.push(`http://${envConfig.hostname}:${config.httpPort}`)
 
 console.log(JSON.stringify(config, null, 4))
 console.log('env config', JSON.stringify(envConfig, null, 4))

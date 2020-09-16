@@ -1,13 +1,19 @@
 import greenlock from 'greenlock-express'
 import { Server } from 'http'
+import { yellow } from 'chalk'
 import app from './app'
 import config, { argv, envConfig } from './config'
 import preRender from './pre-render'
-import staticGen from './static-gen'
+import staticSite from './static-site'
 
-const startHttpServer = (callback: (server: Server) => void) => {
-  console.log(`starting http server...`)
-  const server = app.listen(config.httpPort, '0.0.0.0', () => callback(server))
+const startHttpServer = (callback?: (server: Server) => void) => {
+  const server = app.listen(config.httpPort, '0.0.0.0', () => {
+    console.log(yellow(`server started at http://${envConfig.hostname}:${config.httpPort}`))
+    if (callback) {
+      callback(server)
+    }
+  })
+  return server
 }
 
 const command = argv._[0]
@@ -29,10 +35,7 @@ switch (command) {
         })
         .serve(app)
     } else {
-      console.log(`starting express http server...`)
-      startHttpServer(() => {
-        console.log(`server started at http://${envConfig.hostname}:${config.httpPort}`)
-      })
+      startHttpServer()
     }
     if (config.preRender) {
       console.log(`pre-rendering the pages...`)
@@ -45,12 +48,18 @@ switch (command) {
     break
   case 'static-site':
     // eslint-disable-next-line no-case-declarations
-    startHttpServer(async (server) => {
-      console.log(`server started at http://${envConfig.hostname}:${config.httpPort}`)
-      await staticGen()
-      server.close()
-      process.exit(0)
-    })
+    const server = startHttpServer()
+    staticSite()
+      .then(() => {
+        console.info('static site finished')
+        server.close()
+        process.exit(0)
+      })
+      .catch((e) => {
+        console.error('static site failed', e)
+        server.close()
+        process.exit(1)
+      })
     break
   default:
     console.log(`unrecognized command: ${command}`)

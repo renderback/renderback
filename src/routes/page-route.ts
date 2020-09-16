@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import { red } from 'chalk'
 import config, { envConfig, PageProxyRoute, PageRoute } from '../config'
 import renderUrl from '../render-url'
 
@@ -16,16 +17,18 @@ export const pageRoute = async (route: PageRoute | PageProxyRoute, req: Request,
     )
     process.exit(1)
   }
-  const { content, etag, ttRenderMs, status } = await renderUrl(
-    route.type === 'page-proxy'
-      ? `${route.target}${req.originalUrl}`
-      : `http://${envConfig.hostname}:${config.httpPort}${req.originalUrl}`
-  )
-  if (ttRenderMs) {
-    // See https://w3c.github.io/server-timing/.
-    res.set('Server-Timing', `Prerender;dur=${ttRenderMs};desc="Headless render time (ms)"`)
+  if (route.type === 'page-proxy') {
+    const { content, etag, ttRenderMs, status } = await renderUrl(
+      `http://${envConfig.hostname}:${config.httpPort}${req.originalUrl}`
+    )
+    if (ttRenderMs) {
+      // See https://w3c.github.io/server-timing/.
+      res.set('Server-Timing', `Prerender;dur=${ttRenderMs};desc="Headless render time (ms)"`)
+    }
+    res.set('etag', etag)
+    res.status(status).contentType('text/html').send(content)
+    return res
   }
-  res.set('etag', etag)
-  res.status(status).send(content)
-  return res
+  console.error(red(`[page-route] unknown route type: ${route.type}`))
+  return res.status(500).send(`unknown route type: ${route.type}`)
 }

@@ -4,9 +4,8 @@ import config from './config'
 
 const { page: pageConfig } = config
 
-async function renderPage(page: Page): Promise<[number, string]> {
+async function renderPage(page: Page, origins: string[], pathifySingleParams?: boolean): Promise<[number, string]> {
   try {
-    // networkidle0 waits for the network to be idle (no requests for 500ms).
     console.log(`[render-page] wait for selector: ${pageConfig.waitSelector}`)
     await page.waitForSelector(pageConfig.waitSelector)
   } catch (err) {
@@ -16,18 +15,36 @@ async function renderPage(page: Page): Promise<[number, string]> {
     throw new Error(`Wait for selector (${pageConfig.waitSelector}) timed out`)
   }
 
-  if (pageConfig.statusCodeSelector) {
+  let status = 200
+  if (pageConfig.statusCodeSelector !== '') {
     // eslint-disable-next-line no-eval
-    const status = Number(await page.$eval(pageConfig.statusCodeSelector, eval(pageConfig.statusCodeFunction)))
+    status = Number(await page.$eval(pageConfig.statusCodeSelector, eval(pageConfig.statusCodeFunction)))
     if (status >= 200 && status < 300) {
       console.log(`[render-page] status: ${cyan(status)}`)
     } else {
       console.log(`[render-page] status: ${red(status)}`)
     }
-    return [status, await page.content()]
   }
 
-  return [200, await page.content()]
+  if (pathifySingleParams) {
+    await page.$$eval('a', (elements) => {
+      elements.forEach((element: any) => {
+        const { href } = element
+        const url = new URL(href)
+        if (origins.some((o) => o === url.origin)) {
+          const searchEntries = Array.from(url.searchParams.entries())
+          if (searchEntries.length === 1) {
+            // eslint-disable-next-line no-param-reassign
+            element.href = `${href}/${encodeURIComponent(searchEntries[0][0])}/${encodeURIComponent(
+              searchEntries[0][1]
+            )}`
+          }
+        }
+      })
+    })
+  }
+
+  return [status, await page.content()]
 }
 
 export default renderPage

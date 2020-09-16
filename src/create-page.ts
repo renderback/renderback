@@ -20,12 +20,6 @@ const createPage = async (browser: Browser): Promise<Page> => {
     })
   }
 
-  if (config.log.pageLocation) {
-    page.on('load', () => {
-      page.evaluate('console.log("Browser location", document.location)')
-    })
-  }
-
   if (config.log.pageErrors) {
     page.on('pageerror', ({ message }) => console.log(red('[page] error:'), message))
   }
@@ -38,11 +32,15 @@ const createPage = async (browser: Browser): Promise<Page> => {
     page.on('requestfailed', (request) => {
       const resourceRequest = ['image', 'stylesheet', 'font'].indexOf(request.resourceType()) !== -1
       if (
-        (resourceRequest && !pageConfig.abortResourceRequests) ||
-        (!resourceRequest && !isRequestBlacklisted(request))
+        request.failure()?.errorText !== 'net::ERR_ABORTED' &&
+        ((resourceRequest && !pageConfig.abortResourceRequests) || (!resourceRequest && !isRequestBlacklisted(request)))
       ) {
         console.error(
-          red(`[page] request failed: ${request.resourceType()} ${request.failure().errorText} ${request.url()}`),
+          red(
+            `[page] request failed: ${request.resourceType()} ${
+              request.failure().errorText
+            } ${request.url()} failure: ${request.failure()?.errorText}`
+          ),
           request.failure()
         )
       }
@@ -52,32 +50,31 @@ const createPage = async (browser: Browser): Promise<Page> => {
 
   if (pageConfig.abortResourceRequests) {
     console.log(magenta(`[create-page] will abort resource requests: ${resourcesToAbort}`))
-    page.on('request', (request) => {
-      if (resourcesToAbort.indexOf(request.resourceType()) !== -1) {
-        if (config.log.pageAbortedRequests) {
-          console.log(gray(`[page] request aborted - type==${request.resourceType()}: ${request.url()}`))
-        }
-        request.abort().catch(() => Promise.resolve())
-      } else {
-        request.continue().catch(() => Promise.resolve())
-      }
-    })
   } else {
     console.log(magenta(`[create-page] will NOT abort resource requests`))
   }
   if (pageConfig.requestBlacklist.length > 0) {
     console.log(magenta(`[create-page] will abort blacklisted requests: ${pageConfig.requestBlacklist}`))
-    page.on('request', (request) => {
-      if (isRequestBlacklisted(request)) {
-        if (config.log.pageAbortedRequests) {
-          console.log(gray(`[page] request aborted - blacklist: ${request.url()}`))
-        }
-        request.abort().catch(() => Promise.resolve())
-      } else {
-        request.continue().catch(() => Promise.resolve())
-      }
-    })
   }
+
+  page.on('request', (request) => {
+    if (config.log.pageRequests) {
+      console.log(gray(`[page] request - type==${request.resourceType()}: ${request.url()}`))
+    }
+    if (pageConfig.abortResourceRequests && resourcesToAbort.indexOf(request.resourceType()) !== -1) {
+      if (config.log.pageAbortedRequests) {
+        console.log(gray(`[page] request aborted - type==${request.resourceType()}: ${request.url()}`))
+      }
+      request.abort().catch(() => Promise.resolve())
+    } else if (isRequestBlacklisted(request)) {
+      if (config.log.pageAbortedRequests) {
+        console.log(gray(`[page] request aborted - blacklist: ${request.url()}`))
+      }
+      request.abort().catch(() => Promise.resolve())
+    } else {
+      request.continue().catch(() => Promise.resolve())
+    }
+  })
 
   return page
 }

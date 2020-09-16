@@ -1,10 +1,10 @@
-import express from 'express'
+import express, { Request, Response } from 'express'
 import errorHandler from 'errorhandler'
 import path from 'path'
 import proxy from 'express-http-proxy'
 import promMid from 'express-prometheus-middleware'
 import { yellow, red, cyan } from 'chalk'
-import config, { Route } from './config'
+import config, { envConfig, Route } from './config'
 import cache from './cache'
 import preRender from './pre-render'
 import { proxyRoute } from './routes/proxy-route'
@@ -20,6 +20,10 @@ const app = express()
 app.enable('etag')
 app.use(promMid())
 app.use(errorHandler())
+app.use((req, res, next) => {
+  console.log(`[app] request: ${req.method} ${req.url}`)
+  next()
+})
 
 const shortRouteDescription = (route: Route): string => {
   switch (route.type) {
@@ -72,11 +76,6 @@ app.post('/__ssr/admin/clear-cache', async (req, res) => {
     if (shouldPreRender) {
       if (!config.preRender) {
         return res.status(200).send(`Cache cleared. Pre-rendering has not been run: pre-render is not configured.`)
-      }
-      if (config.preRenderPaths.length === 0) {
-        return res
-          .status(200)
-          .send(`Cache cleared. Pre-rendering has not been run: pre-render path are not configured.`)
       }
       await preRender()
       return res.status(200).send(`Cache cleared. Pre-rendering has been run.`)
@@ -133,9 +132,36 @@ config.routes.forEach((route) => {
         if (req.header('User-Agent') === config.userAgent) {
           req.url = req.originalUrl
           if (config.log.selfRequests) {
-            console.log(`[app] self request: ${req.originalUrl}, proxying -> ${route.target}${req.url}`)
+            console.log(`[app] self request: ${cyan(req.originalUrl)} proxying -> ${route.target}${req.url}`)
           }
-          return proxy(route.target)(req, res, next)
+          return proxy(route.target, {
+            userResDecorator: (proxyRes: Response, proxyResData: any, userReq: Request, userRes: Response) => {
+              if (proxyRes.statusCode >= 301 && proxyRes.statusCode <= 303) {
+                if (config.log.selfRequests) {
+                  console.log(
+                    `[app] self request: ${cyan(req.originalUrl)} proxy redirect: ${proxyRes.statusCode} ${
+                      (proxyRes as any).headers.location
+                    }`
+                  )
+                }
+                userRes.status(proxyRes.statusCode)
+                const locationUrl = new URL((proxyRes as any).headers.location)
+                locationUrl.hostname = envConfig.hostname
+                locationUrl.protocol = 'http'
+                locationUrl.port = String(config.httpPort)
+                userRes.setHeader('location', locationUrl.toString())
+                return ''
+              }
+              if (!(proxyRes.statusCode >= 200 && proxyRes.statusCode < 300)) {
+                if (config.log.selfRequests) {
+                  console.log(
+                    `[app] self request: ${cyan(req.originalUrl)} proxy non-200 response: ${proxyRes.statusCode}`
+                  )
+                }
+              }
+              return proxyResData
+            },
+          })(req, res, next)
         }
 
         return pageRoute(route, req, res)

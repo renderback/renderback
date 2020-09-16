@@ -2,7 +2,7 @@ import { yellow } from 'chalk'
 import config from './config'
 import createPage from './create-page'
 import renderPage from './render-page'
-import cache, { CacheEntry } from './cache'
+import cache, { CacheEntry, cachePageRenderResult } from './cache'
 import createBrowser from './create-browser'
 import { renderTimeMetric } from './metrics'
 
@@ -18,7 +18,8 @@ const renderUrl = async (url: string): Promise<CacheEntry & { ttRenderMs?: numbe
   if (config.log.navigation) {
     console.log(yellow(`[render-url] navigating to: ${url}`))
   }
-  await page.goto(url, { waitUntil: 'networkidle0' })
+  const response = await page.goto(url, { waitUntil: 'networkidle0' }) // networkidle0 waits for the network to be idle (no requests for 500ms).
+  const redirects = response.request().redirectChain()
   const [status, html] = await renderPage(page)
   await page.close()
   const ttRenderMs = Date.now() - start
@@ -26,8 +27,7 @@ const renderUrl = async (url: string): Promise<CacheEntry & { ttRenderMs?: numbe
   if (config.log.renderTime) {
     console.info(yellow(`[render-url] ${url}: ${ttRenderMs}ms.`))
   }
-
-  const entry = cache.set(url, html, status)
+  const entry = cachePageRenderResult({ url, html, status, redirects })
   return { ttRenderMs, ...entry }
 }
 
