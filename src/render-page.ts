@@ -1,10 +1,13 @@
 import { Page } from 'puppeteer-core'
 import { cyan, gray, red } from 'chalk'
+import { minify } from 'html-minifier'
 import config from './config'
+import { PageScraper } from './page-scraper'
+import { regexReplaceAll } from './content-rewrite'
 
-const { page: pageConfig } = config
+async function renderPage(page: Page, pageScraper?: PageScraper, scrapeDepth?: number): Promise<[number, string]> {
+  const { page: pageConfig, pathifyParams } = config
 
-async function renderPage(page: Page, origins: string[], pathifySingleParams?: boolean): Promise<[number, string]> {
   try {
     console.log(`[render-page] wait for selector: ${pageConfig.waitSelector}`)
     await page.waitForSelector(pageConfig.waitSelector)
@@ -26,25 +29,84 @@ async function renderPage(page: Page, origins: string[], pathifySingleParams?: b
     }
   }
 
-  if (pathifySingleParams) {
-    await page.$$eval('a', (elements) => {
-      elements.forEach((element: any) => {
+  if (pageScraper && scrapeDepth) {
+    await pageScraper.scrape(page, scrapeDepth)
+  }
+
+  if (pathifyParams) {
+    await page.evaluate((origins: string[]) => {
+      // eslint-disable-next-line no-undef
+      document.querySelectorAll('a').forEach((element) => {
         const { href } = element
         const url = new URL(href)
         if (origins.some((o) => o === url.origin)) {
           const searchEntries = Array.from(url.searchParams.entries())
-          if (searchEntries.length === 1) {
-            // eslint-disable-next-line no-param-reassign
-            element.href = `${href}/${encodeURIComponent(searchEntries[0][0])}/${encodeURIComponent(
-              searchEntries[0][1]
-            )}`
+          if (searchEntries.length === 0) {
+            return
           }
+          searchEntries.sort((a1, a2) => {
+            if (a1[0] === a2[0]) {
+              return 0
+            }
+            if (a1[0] < a2[0]) {
+              return -1
+            }
+            return 1
+          })
+          const newHref = `${url.pathname}/${searchEntries
+            .map((searchEntry) => `${encodeURIComponent(searchEntry[0])}/${encodeURIComponent(searchEntry[1])}`)
+            .join('/')}`
+
+          console.log(`[render-page] setting new href: ${url} -> ${newHref}`)
+          // eslint-disable-next-line no-param-reassign
+          element.href = newHref
         }
       })
-    })
+    }, config.origins)
   }
 
-  return [status, await page.content()]
+  if (config.rewrite.cssSelectorRemove) {
+    for (const selector of config.rewrite.cssSelectorRemove) {
+      console.log(`[render-page] removing by css selector: ${selector}`)
+      // eslint-disable-next-line no-await-in-loop
+      await page.$$eval(selector, (elements) => {
+        elements.forEach((element) => {
+          element.parentNode.removeChild(element)
+        })
+      })
+    }
+  }
+
+  if (config.rewrite.cssSelectorUpdate) {
+    for (const [selector, updateFunction] of config.rewrite.cssSelectorUpdate) {
+      console.log(`[render-page] updating by css selector: ${selector} ${updateFunction}`)
+      // eslint-disable-next-line no-await-in-loop
+      await page.evaluate(
+        // eslint-disable-next-line no-loop-func
+        (selectorStr, functionStr) => {
+          // eslint-disable-next-line no-undef
+          document.querySelectorAll(selectorStr).forEach((element) => {
+            // eslint-disable-next-line no-eval
+            eval(functionStr)(element)
+          })
+        },
+        selector,
+        updateFunction
+      )
+    }
+  }
+
+  let content = await page.content()
+
+  if (config.rewrite.regexReplace) {
+    content = regexReplaceAll(content, config.rewrite.regexReplace)
+  }
+
+  if (config.rewrite.minify) {
+    content = minify(content, config.rewrite.minify)
+  }
+
+  return [status, content]
 }
 
 export default renderPage

@@ -2,8 +2,18 @@ import _ from 'lodash'
 import fs from 'fs'
 import os from 'os'
 import yargsRaw from 'yargs'
-import { Options } from 'html-minifier'
-import { envString, envNumber, envBoolean, envStringList, envNumberList } from './env-config'
+import htmlMinifier from 'html-minifier'
+import {
+  envString,
+  envNumber,
+  envBoolean,
+  envStringList,
+  envNumberList,
+  argvStringList,
+  argvNumberList,
+  argvJson,
+  envJson,
+} from './config-utils'
 
 export interface Config {
   browserExecutable?: string
@@ -13,12 +23,20 @@ export interface Config {
   enableCache: boolean
   adminAccessKey: string
   origins: string[]
-  pathifySingleParams: boolean
+  pathifyParams: boolean
   preRender?: PreRenderConfig
   log: LogConfig
   page: PageConfig
   routes: Route[]
+  rewrite: ContentRewriteConfig
   static?: StaticSiteConfig
+}
+
+export interface ContentRewriteConfig {
+  minify?: htmlMinifier.Options
+  regexReplace?: [string, string][]
+  cssSelectorRemove?: string[]
+  cssSelectorUpdate?: [string, string][]
 }
 
 export interface PreRenderConfig {
@@ -31,11 +49,8 @@ export interface PreRenderConfig {
 
 export interface StaticSiteConfig {
   contentOutput?: string
-  pageReplace?: [[string, string]]
-  pageReplaceAfterMinimize?: [[string, string]]
   nginx?: StaticSiteNginxConfig
   s3?: StaticSiteS3Config
-  minify?: Options
 }
 
 export interface StaticSiteNginxConfig {
@@ -154,13 +169,12 @@ const defaultConfig: Config = {
   enableCache: true,
   adminAccessKey: '',
   origins: [],
-  pathifySingleParams: false,
+  pathifyParams: false,
   page: {
     waitSelector: 'title[data-status]',
     preNavigationScript: "document.head.querySelector('title').removeAttribute('data-status')",
     statusCodeSelector: 'title[data-status]',
     statusCodeFunction: '(e) => e.dataset.status',
-    // eslint-disable-next-line no-template-curly-in-string
     abortResourceRequests: true,
     requestBlacklist: [],
   },
@@ -178,6 +192,7 @@ const defaultConfig: Config = {
     cache: false,
   },
   routes: [],
+  rewrite: {},
 }
 
 export const { argv } = yargsRaw
@@ -391,6 +406,16 @@ export const { argv } = yargsRaw
       description: 'AWS profile to be used in the upload script (static site)',
       demandOption: false,
     },
+    'rewrite-minify': {
+      type: 'string',
+      description: 'Options for html-minify (JSON object), "{}" to enable and use defaults',
+      demandOption: false,
+    },
+    'rewrite-css-selector-remove': {
+      type: 'array',
+      description: 'CSS selectors to remove from page',
+      demandOption: false,
+    },
   })
   .demandCommand(1, 1)
 
@@ -426,17 +451,13 @@ config.userAgent = argv['user-agent'] || envString('USER_AGENT') || config.userA
 config.httpPort = argv['http-port'] || envNumber('HTTP_PORT') || config.httpPort
 config.adminAccessKey = envString('ADMIN_ACCESS_KEY') || config.adminAccessKey
 config.enableCache = argv['enable-cache'] || envBoolean('ENABLE_CACHE') || config.enableCache
-config.origins =
-  (argv.origins ? argv.origins.map((s) => String(s)) : undefined) || envStringList('ORIGINS') || config.origins
+config.origins = argvStringList(argv.origins) || envStringList('ORIGINS') || config.origins
 
 config.preRender = {
   ...(config.preRender || {}),
   ...{
     enabled: argv['pre-render'] || envBoolean('PRE_RENDER') || config.preRender?.enabled,
-    paths:
-      (argv['pre-render-paths'] && argv['pre-render-paths'].map((s) => s as string)) ||
-      envStringList('PRE_RENDER_PATHS') ||
-      config.preRender?.paths,
+    paths: argvStringList(argv['pre-render-paths']) || envStringList('PRE_RENDER_PATHS') || config.preRender?.paths,
     scrape: argv['pre-render-scrape'] || envBoolean('PRE_RENDER_SCRAPE') || config.preRender?.scrape,
     scrapeDepth:
       argv['pre-render-scrape-depth'] || envNumber('PRE_RENDER_SCRAPE_DEPTH') || config.preRender?.scrapeDepth,
@@ -474,15 +495,25 @@ config.page.abortResourceRequests =
   config.page.abortResourceRequests
 
 config.page.requestBlacklist =
-  (argv['page-request-blacklist'] ? argv['page-request-blacklist'].map((s) => String(s)) : undefined) ||
+  argvStringList(argv['page-request-blacklist']) ||
   envStringList('PAGE_REQUEST_BLACKLIST') ||
   config.page.requestBlacklist
 
 config.static.contentOutput =
   argv['static-content-output'] || envString('STATIC_CONTENT_OUTPUT') || config.static.contentOutput
 
-config.pathifySingleParams =
-  argv['pathify-single-params'] || envBoolean('PATHIFY_SINGLE_PARAMS') || config.pathifySingleParams
+config.pathifyParams = argv['pathify-single-params'] || envBoolean('PATHIFY_SINGLE_PARAMS') || config.pathifyParams
+
+config.rewrite = {
+  ...(config.rewrite || {}),
+  ...{
+    cssSelectorRemove:
+      argvStringList(argv['rewrite-css-selector-remove']) ||
+      envStringList('REWRITE_CSS_SELECTOR_REMOVE') ||
+      config.rewrite?.cssSelectorRemove,
+    minify: argvJson(argv['rewrite-minify']) || envJson('REWRITE_MINIFY') || config.rewrite?.minify,
+  },
+}
 
 config.static = {
   ...(config.static || {}),
@@ -497,7 +528,7 @@ config.static = {
         notFoundPage:
           argv['static-not-found-page'] || envString('STATIC_NOT_FOUND_PAGE') || config.static?.nginx?.notFoundPage,
         errorPage: argv['static-error-page'] || envString('STATIC_ERROR_PAGE') || config.static?.nginx?.errorPage,
-        errorCodes: (argv['static-error-codes'] ? argv['static-error-codes'].map((s) => Number(s)) : undefined) ||
+        errorCodes: argvNumberList(argv['static-error-codes']) ||
           envNumberList('STATIC_ERROR_CODES') ||
           config.static?.nginx?.errorCodes || [500, 502],
       },

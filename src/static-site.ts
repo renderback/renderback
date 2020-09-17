@@ -1,9 +1,8 @@
 import fs from 'fs'
 import prettyBytes from 'pretty-bytes'
 import { cyan, green, red, yellow } from 'chalk'
-import { minify } from 'html-minifier'
 import preRender from './pre-render'
-import config, { Route, runtimeConfig } from './config'
+import config, { runtimeConfig } from './config'
 import cache from './cache'
 import { getFileName } from './util'
 import { copyDirRecursiveSync } from './copy-dir'
@@ -35,7 +34,7 @@ const staticSite = async (): Promise<void> => {
   console.log(`[static-site] pre-rendering...`)
   await preRender()
 
-  const processRoute = async (route: Route) => {
+  for (const route of config.routes) {
     switch (route.type) {
       case 'asset':
         console.log(`[static-site] copying assets: ${yellow(route.dir)} -> ${yellow(staticSiteConfig.contentOutput)}`)
@@ -47,11 +46,6 @@ const staticSite = async (): Promise<void> => {
     }
   }
 
-  for (const route of config.routes) {
-    // eslint-disable-next-line no-await-in-loop
-    await processRoute(route)
-  }
-
   console.log(yellow('[static-site] writing page files...'))
   const pageEntries = cache.listEntries()
   for (const [urlStr, entry] of pageEntries) {
@@ -59,36 +53,8 @@ const staticSite = async (): Promise<void> => {
 
     const { status } = entry
     if (!(status >= 301 && status <= 303)) {
-      const fileName = getFileName(
-        staticSiteConfig.contentOutput,
-        urlStr,
-        staticSiteConfig.pathifySingleParams,
-        '.html'
-      )
-      let { content } = entry
-      if (staticSiteConfig.pageReplace) {
-        console.log(`[static-site] applying ${staticSiteConfig.pageReplace.length} replacements`)
-        staticSiteConfig.pageReplace.forEach(([regex, replacement]) => {
-          if (content.toString().match(new RegExp(regex))) {
-            content = Buffer.from(content.toString().replace(new RegExp(regex), replacement))
-          } else {
-            console.log(`[static-site] ${red('no matches')}: ${regex}`)
-          }
-        })
-      }
-      content = Buffer.from(minify(content.toString(), staticSiteConfig.minify))
-      if (staticSiteConfig.pageReplaceAfterMinimize) {
-        console.log(
-          `[static-site] applying ${staticSiteConfig.pageReplaceAfterMinimize.length} replacements (after html-minimize)`
-        )
-        staticSiteConfig.pageReplaceAfterMinimize.forEach(([regex, replacement]) => {
-          if (content.toString().match(new RegExp(regex))) {
-            content = Buffer.from(content.toString().replace(new RegExp(regex), replacement))
-          } else {
-            console.log(`[static-site] ${red('no matches')}: ${regex}`)
-          }
-        })
-      }
+      const fileName = getFileName(staticSiteConfig.contentOutput, urlStr, config.pathifyParams, '.html')
+      const { content } = entry
       outputFile(staticSiteConfig.contentOutput, fileName, content)
     }
   }
@@ -109,7 +75,6 @@ const staticSite = async (): Promise<void> => {
   if (staticSiteConfig.nginx) {
     const nginxConfig = buildNginxConfig({
       contentRoot: staticSiteConfig.contentOutput,
-      pathifySingleParams: staticSiteConfig.pathifySingleParams,
       ...staticSiteConfig.nginx,
     })
     console.log(`[static-site] writing nginx config into ${yellow(staticSiteConfig.nginx.configFile)}`)
@@ -118,7 +83,7 @@ const staticSite = async (): Promise<void> => {
   if (staticSiteConfig.s3) {
     const s3UploadScript = buildS3UploadScript({
       contentRoot: staticSiteConfig.contentOutput,
-      pathifySingleParams: staticSiteConfig.pathifySingleParams,
+      pathifyParams: config.pathifyParams,
       ...staticSiteConfig.s3,
     })
     console.log(`[static-site] writing s3 upload script into ${yellow(staticSiteConfig.s3.uploadScript)}`)

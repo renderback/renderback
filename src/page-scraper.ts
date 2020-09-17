@@ -75,11 +75,12 @@ export class PageScraper {
 
       console.log('[page-scraper] found links: ', urls.length)
       urls.forEach((a) => {
-        if (this._seenPaths.indexOf(a.pathname) === -1 && !this._pathsToVisit.some((p) => p.path === a.pathname)) {
-          console.log(`[page-scraper] found link: ${a.pathname}`)
-          this._seenPaths.push(a.pathname)
+        const path = `${a.pathname}${a.searchParams.toString() === '' ? '' : `?${a.searchParams.toString()}`}`
+        if (this._seenPaths.indexOf(path) === -1 && !this._pathsToVisit.some((p) => p.path === path)) {
+          console.log(`[page-scraper] found link: ${path}`)
+          this._seenPaths.push(path)
           this._pathsToVisit.push({
-            path: a.pathname,
+            path,
             initial: false,
             depth: depth + 1,
           })

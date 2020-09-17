@@ -35,13 +35,6 @@ const preRender = async (): Promise<{ pagesRendered: number }> => {
       depth: 1,
     }))
   )
-  // const pathsToVisit: { path: string; initial: boolean; depth: number }[] = console.log(
-  //   'initial paths to visit',
-  //   pathsToVisit
-  // )
-
-  // const seenPaths: string[] = [...(paths || ['/'])]
-  // const visitedPaths: string[] = []
 
   const processPath = async (path: string, initial: boolean, depth: number) => {
     console.log(`[pre-render] processing path: ${path} depth: ${depth}${initial ? ' initial' : ''}`)
@@ -87,7 +80,7 @@ const preRender = async (): Promise<{ pagesRendered: number }> => {
       }
     }
 
-    const [status, html] = await renderPage(page, config.origins)
+    const [status, html] = await renderPage(page, scrape ? pageScraper : undefined, scrape ? depth : undefined)
     timerHandle()
     const pathRenderMs = Date.now() - pathStart
     if (config.log.renderTime) {
@@ -95,9 +88,6 @@ const preRender = async (): Promise<{ pagesRendered: number }> => {
     }
 
     cachePageRenderResult({ url, html, status, redirects })
-    if (scrape) {
-      await pageScraper.scrape(page, depth)
-    }
     if (!pageConfig.navigateFunction) {
       await page.close()
       page = await createPage(browser)
@@ -114,9 +104,9 @@ const preRender = async (): Promise<{ pagesRendered: number }> => {
 
     // eslint-disable-next-line no-await-in-loop
     await processPath(path, initial, depth)
-    console.log(magenta(`[pre-render] path to visit remaining: ${pageScraper.remaining()}`))
+    console.log(magenta(`[pre-render] paths to visit remaining: ${pageScraper.remaining()}`))
     if (preRenderConfig.pause) {
-      console.log(blueBright(`[pre-render] pause between pages: ${preRenderConfig.pause}ms`))
+      console.log(blueBright(`[pre-render] pausing between paths: ${preRenderConfig.pause}ms`))
       await snooze(preRenderConfig.pause)
     }
     await processPaths()

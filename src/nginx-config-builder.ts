@@ -55,9 +55,7 @@ export const buildNginxConfig = ({
   errorPage,
   errorCodes,
   extraConfig,
-}: // pathifySingleParams,
-{
-  pathifySingleParams: boolean
+}: {
   contentRoot: string
 } & StaticSiteNginxConfig): string => {
   const entries = cache.listEntries()
@@ -104,18 +102,6 @@ export const buildNginxConfig = ({
       })
     })
 
-    // if (pathifySingleParams) {
-    //   const pageEntries = cache.listEntries()
-    //   for (const [urlStr, entry] of entries) {
-    //     const url = new URL(urlStr)
-    //     const searchEntries = Array.from(url.searchParams.entries())
-    //     if (searchEntries.length === 1 && pathifySingleParams) {
-    //       nginxConfig.appendBlock(`location ${url.pathname}${singleParamPathSuffix(searchEntries[0])} {`, '}', () => {
-    //         nginxConfig.appendConfig('try_files $uri.html =404;')
-    //       })
-    //     }
-    //   }
-    // }
     config.routes.forEach(async (route) => {
       const matchers = buildMatcher(route)
       switch (route.type) {
@@ -156,7 +142,9 @@ export const buildNginxConfig = ({
       const url = new URL(urlStr)
       const { pathname, searchParams } = url
       if (searchParams.toString().length > 0) {
-        console.warn('[static-site] cannot route URLs with search query in nginx config', urlStr)
+        if (!config.pathifyParams) {
+          console.warn('[static-site] cannot route URLs with search query in nginx config', urlStr)
+        }
       } else {
         const { status, location } = entry
         if (status >= 301 && status <= 303) {

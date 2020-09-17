@@ -27,19 +27,30 @@ export const matcherToNginx = (matcher: string | RegExp): string => {
   return `location ~ ${regex}`
 }
 
-export const singleParamPathSuffix = (url: URL): string | undefined => {
+export const paramsToPathSuffix = (url: URL): string | undefined => {
   const { searchParams } = url
   const searchEntries = Array.from(searchParams.entries())
-  if (searchEntries.length === 1) {
-    return `/${encodeURIComponent(searchEntries[0][0])}/${encodeURIComponent(searchEntries[0][1])}`
+  if (searchEntries.length === 0) {
+    return undefined
   }
-  return undefined
+  searchEntries.sort((a1, a2) => {
+    if (a1[0] === a2[0]) {
+      return 0
+    }
+    if (a1[0] < a2[0]) {
+      return -1
+    }
+    return 1
+  })
+  return `/${searchEntries
+    .map((searchEntry) => `${encodeURIComponent(searchEntry[0])}/${encodeURIComponent(searchEntry[1])}`)
+    .join('/')}`
 }
 
 export const getFileName = (
   outputDir: string,
   urlString: string,
-  pathifySingleParams: boolean,
+  pathifyParams: boolean,
   fileNameSuffix?: string
 ): string => {
   const url = new URL(urlString)
@@ -50,10 +61,10 @@ export const getFileName = (
   const fileNameWithoutSearchParams = baseName === '' ? 'index' : baseName
 
   const searchEntries = Array.from(searchParams.entries())
-  const singleParamPathified = singleParamPathSuffix(url)
+  const paramsPathified = paramsToPathSuffix(url)
   let searchParamsEncoded: string
-  if (singleParamPathified && pathifySingleParams) {
-    searchParamsEncoded = singleParamPathified
+  if (paramsPathified && pathifyParams) {
+    searchParamsEncoded = paramsPathified
   } else if (searchEntries.length > 0) {
     searchParamsEncoded = `-${Buffer.from(searchParams.toString()).toString('base64')}`
   }
