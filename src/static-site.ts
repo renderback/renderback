@@ -22,10 +22,7 @@ const staticSite = async (): Promise<void> => {
   }
   console.log(green(`[static-site] generating static site into ${staticSiteConfig.contentOutput}...`))
 
-  config.preRender = {
-    ...(config.preRender || {}),
-    ...{ enabled: true },
-  }
+  config.preRender.enabled = true
 
   runtimeConfig.cacheEverything = true
   if (config.routes.some((route) => route.type === 'asset-proxy')) {
@@ -53,7 +50,13 @@ const staticSite = async (): Promise<void> => {
 
     const { status } = entry
     if (!(status >= 301 && status <= 303)) {
-      const fileName = getFileName(staticSiteConfig.contentOutput, urlStr, config.pathifyParams, '.html')
+      const fileName = getFileName({
+        outputDir: staticSiteConfig.contentOutput,
+        urlString: urlStr,
+        pathifyParams: config.urlRewrite.pathifyParams,
+        urlRewrite: config.urlRewrite.regex,
+        fileNameSuffix: '.html',
+      })
       const { content } = entry
       outputFile(staticSiteConfig.contentOutput, fileName, content)
     }
@@ -63,7 +66,12 @@ const staticSite = async (): Promise<void> => {
   const assetEntries = cache.listAssetEntries()
   for (const [urlStr, entry] of assetEntries) {
     if (!(entry.status >= 301 && entry.status <= 303)) {
-      const fileName = getFileName(staticSiteConfig.contentOutput, urlStr, false)
+      const fileName = getFileName({
+        outputDir: staticSiteConfig.contentOutput,
+        urlString: urlStr,
+        pathifyParams: false,
+        urlRewrite: [],
+      })
       try {
         outputFile(staticSiteConfig.contentOutput, fileName, entry.content)
       } catch (e) {
@@ -75,6 +83,7 @@ const staticSite = async (): Promise<void> => {
   if (staticSiteConfig.nginx) {
     const nginxConfig = buildNginxConfig({
       contentRoot: staticSiteConfig.contentOutput,
+      urlRewrites: config.urlRewrite.regex,
       ...staticSiteConfig.nginx,
     })
     console.log(`[static-site] writing nginx config into ${yellow(staticSiteConfig.nginx.configFile)}`)
@@ -83,7 +92,8 @@ const staticSite = async (): Promise<void> => {
   if (staticSiteConfig.s3) {
     const s3UploadScript = buildS3UploadScript({
       contentRoot: staticSiteConfig.contentOutput,
-      pathifyParams: config.pathifyParams,
+      pathifyParams: config.urlRewrite.pathifyParams,
+      urlRewrite: config.urlRewrite.regex,
       ...staticSiteConfig.s3,
     })
     console.log(`[static-site] writing s3 upload script into ${yellow(staticSiteConfig.s3.uploadScript)}`)

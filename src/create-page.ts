@@ -33,7 +33,9 @@ const createPage = async (browser: Browser): Promise<Page> => {
       const resourceRequest = ['image', 'stylesheet', 'font'].indexOf(request.resourceType()) !== -1
       if (
         request.failure()?.errorText !== 'net::ERR_ABORTED' &&
-        ((resourceRequest && !pageConfig.abortResourceRequests) || (!resourceRequest && !isRequestBlacklisted(request)))
+        !isRequestBlacklisted(request) &&
+        resourceRequest &&
+        !pageConfig.abortResourceRequests
       ) {
         console.error(
           red(

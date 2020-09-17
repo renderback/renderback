@@ -24,10 +24,10 @@ const renderUrl = async (url: string): Promise<CacheEntry & { ttRenderMs?: numbe
   await page.close()
   const ttRenderMs = Date.now() - start
   timerHandle()
+  const [renderedUrl, entry] = cachePageRenderResult({ url, html, status, redirects })
   if (config.log.renderTime) {
-    console.info(yellow(`[render-url] ${url}: ${ttRenderMs}ms.`))
+    console.info(yellow(`[render-url] ${renderedUrl}: ${ttRenderMs}ms.`))
   }
-  const entry = cachePageRenderResult({ url, html, status, redirects })
   return { ttRenderMs, ...entry }
 }
 

@@ -13,6 +13,8 @@ import {
   argvNumberList,
   argvJson,
   envJson,
+  argvStringTupleList,
+  envStringTupleList,
 } from './config-utils'
 
 export interface Config {
@@ -23,12 +25,12 @@ export interface Config {
   enableCache: boolean
   adminAccessKey: string
   origins: string[]
-  pathifyParams: boolean
-  preRender?: PreRenderConfig
+  preRender: PreRenderConfig
   log: LogConfig
   page: PageConfig
   routes: Route[]
   rewrite: ContentRewriteConfig
+  urlRewrite: UrlRewriteConfig
   static?: StaticSiteConfig
 }
 
@@ -39,10 +41,16 @@ export interface ContentRewriteConfig {
   cssSelectorUpdate?: [string, string][]
 }
 
+export interface UrlRewriteConfig {
+  regex: [string, string][]
+  pathifyParams: boolean
+}
+
 export interface PreRenderConfig {
   enabled: boolean
+  exclude: string[]
+  scrape: boolean
   paths?: string[]
-  scrape?: boolean
   scrapeDepth?: number
   pause?: number
 }
@@ -169,7 +177,6 @@ const defaultConfig: Config = {
   enableCache: true,
   adminAccessKey: '',
   origins: [],
-  pathifyParams: false,
   page: {
     waitSelector: 'title[data-status]',
     preNavigationScript: "document.head.querySelector('title').removeAttribute('data-status')",
@@ -191,8 +198,17 @@ const defaultConfig: Config = {
     pageFailedRequests: true,
     cache: false,
   },
+  preRender: {
+    enabled: false,
+    scrape: false,
+    exclude: [],
+  },
   routes: [],
   rewrite: {},
+  urlRewrite: {
+    pathifyParams: false,
+    regex: [],
+  },
 }
 
 export const { argv } = yargsRaw
@@ -234,9 +250,14 @@ export const { argv } = yargsRaw
       description: 'Origins to consider part of the site (when scraping, rewriting links, etc)',
       demandOption: false,
     },
-    'pathify-single-params': {
+    'url-rewrite-pathify-params': {
       boolean: true,
       description: 'Replace ..path?param=value with ..path/param/value',
+      demandOption: false,
+    },
+    'url-rewrite-regex': {
+      type: 'array',
+      description: 'Rewrite URLs using regular expressions (ex. "\\/prefix\\/ \\/")',
       demandOption: false,
     },
     'pre-render': {
@@ -261,7 +282,12 @@ export const { argv } = yargsRaw
     },
     'pre-render-paths': {
       type: 'array',
-      description: 'Paths to pre-render (besides /)',
+      description: 'Paths to pre-render',
+      demandOption: false,
+    },
+    'pre-render-exclude': {
+      type: 'array',
+      description: 'Paths to exclude from pre-render (regexp)',
       demandOption: false,
     },
     'log-navigation': {
@@ -458,6 +484,8 @@ config.preRender = {
   ...{
     enabled: argv['pre-render'] || envBoolean('PRE_RENDER') || config.preRender?.enabled,
     paths: argvStringList(argv['pre-render-paths']) || envStringList('PRE_RENDER_PATHS') || config.preRender?.paths,
+    exclude:
+      argvStringList(argv['pre-render-exclude']) || envStringList('PRE_RENDER_EXCLUDE') || config.preRender?.exclude,
     scrape: argv['pre-render-scrape'] || envBoolean('PRE_RENDER_SCRAPE') || config.preRender?.scrape,
     scrapeDepth:
       argv['pre-render-scrape-depth'] || envNumber('PRE_RENDER_SCRAPE_DEPTH') || config.preRender?.scrapeDepth,
@@ -502,7 +530,17 @@ config.page.requestBlacklist =
 config.static.contentOutput =
   argv['static-content-output'] || envString('STATIC_CONTENT_OUTPUT') || config.static.contentOutput
 
-config.pathifyParams = argv['pathify-single-params'] || envBoolean('PATHIFY_SINGLE_PARAMS') || config.pathifyParams
+config.urlRewrite = {
+  ...(config.urlRewrite || {}),
+  ...{
+    pathifyParams:
+      argv['url-rewrite-pathify-params'] || envBoolean('URL_REWRITE_PATHIFY_PARAMS') || config.urlRewrite.pathifyParams,
+    regex:
+      argvStringTupleList(argv['url-rewrite-regex']) ||
+      envStringTupleList('URL_REWRITE_REGEX') ||
+      config.urlRewrite.regex,
+  },
+}
 
 config.rewrite = {
   ...(config.rewrite || {}),

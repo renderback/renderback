@@ -101,16 +101,16 @@ export const cachePageRenderResult = ({
   status: number
   location?: string
   redirects?: Request[]
-}): CacheEntry => {
+}): [string, CacheEntry] => {
   let endUrl = url
   if (redirects?.length > 0) {
     redirects.forEach((r) => {
-      console.log(`[render-page] ${r.url()} -> ${r.frame().url()}`)
+      console.log(`[cache] caching redirect ${r.url()} -> ${r.frame().url()}`)
       cache.set(r.url(), '', 302, new URL(r.frame().url()))
       endUrl = r.frame().url()
     })
   }
-  return cache.set(endUrl, html, status)
+  return [endUrl, cache.set(endUrl, html, status)]
 }
 
 export default cache

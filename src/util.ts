@@ -47,13 +47,24 @@ export const paramsToPathSuffix = (url: URL): string | undefined => {
     .join('/')}`
 }
 
-export const getFileName = (
-  outputDir: string,
-  urlString: string,
-  pathifyParams: boolean,
+export const getFileName = ({
+  outputDir,
+  urlString,
+  pathifyParams,
+  urlRewrite,
+  fileNameSuffix,
+}: {
+  outputDir: string
+  urlString: string
+  pathifyParams: boolean
+  urlRewrite: [string, string][]
   fileNameSuffix?: string
-): string => {
-  const url = new URL(urlString)
+}): string => {
+  let workingUrl = urlString
+  for (const [regex, replace] of urlRewrite) {
+    workingUrl = workingUrl.replace(new RegExp(regex, 'g'), replace)
+  }
+  const url = new URL(workingUrl)
   const { pathname, searchParams } = url
   const rawDirName = path.dirname(pathname)
   const dirName = rawDirName.endsWith('/') ? rawDirName : `${rawDirName}/`

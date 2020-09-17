@@ -55,8 +55,10 @@ export const buildNginxConfig = ({
   errorPage,
   errorCodes,
   extraConfig,
+  urlRewrites,
 }: {
   contentRoot: string
+  urlRewrites: [string, string][]
 } & StaticSiteNginxConfig): string => {
   const entries = cache.listEntries()
   const nginxConfig = new NginxConfigBuilder()
@@ -142,7 +144,7 @@ export const buildNginxConfig = ({
       const url = new URL(urlStr)
       const { pathname, searchParams } = url
       if (searchParams.toString().length > 0) {
-        if (!config.pathifyParams) {
+        if (!config.urlRewrite.pathifyParams) {
           console.warn('[static-site] cannot route URLs with search query in nginx config', urlStr)
         }
       } else {
@@ -150,8 +152,12 @@ export const buildNginxConfig = ({
         if (status >= 301 && status <= 303) {
           console.log(`[static-site] page redirect: ${pathname} ${status} location:${location}`)
           if (location) {
+            let workingLocation = location.toString()
+            for (const [regex, replace] of urlRewrites) {
+              workingLocation = workingLocation.replace(new RegExp(regex, 'g'), replace)
+            }
             nginxConfig.appendBlock(`location ${pathname} {`, '}', () => {
-              nginxConfig.appendConfig(`return 301 ${location.pathname};`)
+              nginxConfig.appendConfig(`return 301 ${new URL(workingLocation).pathname};`)
             })
           } else {
             console.warn(`[static-site] redirect without location: ${pathname}`)
@@ -166,7 +172,11 @@ export const buildNginxConfig = ({
           red(`not configuring a Not Found page: ${notFoundPage} was not rendered (is it listed in pre-render?)`)
         )
       } else {
-        nginxConfig.appendConfig(`error_page 404 ${notFoundPage};`)
+        let workingNotFoundPage = notFoundPage
+        for (const [regex, replace] of urlRewrites) {
+          workingNotFoundPage = workingNotFoundPage.replace(new RegExp(regex, 'g'), replace)
+        }
+        nginxConfig.appendConfig(`error_page 404 ${workingNotFoundPage};`)
       }
     }
 
@@ -174,8 +184,12 @@ export const buildNginxConfig = ({
       if (!cache.get(`http://${envConfig.hostname}:${config.httpPort}${errorPage}`)) {
         console.warn(red(`not configuring an error page: ${errorPage} was not rendered (is it listed in pre-render?)`))
       } else {
+        let workingErrorPage = errorPage
+        for (const [regex, replace] of urlRewrites) {
+          workingErrorPage = workingErrorPage.replace(new RegExp(regex, 'g'), replace)
+        }
         errorCodes.forEach((errorCode) => {
-          nginxConfig.appendConfig(`error_page ${errorCode} ${errorPage};`)
+          nginxConfig.appendConfig(`error_page ${errorCode} ${workingErrorPage};`)
         })
       }
     }

@@ -10,6 +10,8 @@ export interface PathToVisit {
 export class PageScraper {
   private _seenPaths: string[] = []
 
+  private readonly _exclude: string[] = []
+
   private _visitedPaths: string[] = []
 
   private _pathsToVisit: PathToVisit[] = []
@@ -18,9 +20,10 @@ export class PageScraper {
 
   private readonly _origins: string[]
 
-  constructor(scrapeDepth: number, origins: string[]) {
+  constructor(scrapeDepth: number, origins: string[], exclude: string[]) {
     this._scrapeDepth = scrapeDepth
     this._origins = origins
+    this._exclude = exclude
   }
 
   seen(path: string[]): void {
@@ -70,6 +73,7 @@ export class PageScraper {
             return null
           }
         })
+        .filter((u) => !this._exclude.some((exclude) => u.pathname.match(new RegExp(exclude))))
         .filter((u) => u !== null)
         .filter((a) => this._origins.some((origin) => origin === a.origin))
 

@@ -60,9 +60,11 @@ export const buildS3UploadScript = ({
   bucketName,
   awsProfile,
   pathifyParams,
+  urlRewrite,
 }: {
   contentRoot: string
   pathifyParams: boolean
+  urlRewrite: [string, string][]
 } & StaticSiteS3Config): string => {
   const uploadScript = new S3UploadScriptBuilder(awsProfile, bucketName)
 
@@ -80,7 +82,12 @@ export const buildS3UploadScript = ({
 
     const { status } = entry
     if (!(status >= 301 && status <= 303)) {
-      const fileName = getFileName(contentRoot, urlStr, pathifyParams)
+      const fileName = getFileName({
+        outputDir: contentRoot,
+        urlString: urlStr,
+        pathifyParams,
+        urlRewrite,
+      })
       uploadScript.cp({
         source: `${contentRoot}${fileName}.html`,
         target: fileName,
@@ -99,7 +106,12 @@ export const buildS3UploadScript = ({
   const assetEntries = cache.listAssetEntries()
   for (const [urlStr, entry] of assetEntries) {
     if (!(entry.status >= 301 && entry.status <= 303)) {
-      const fileName = getFileName(contentRoot, urlStr, pathifyParams)
+      const fileName = getFileName({
+        outputDir: contentRoot,
+        urlString: urlStr,
+        pathifyParams,
+        urlRewrite: [],
+      })
       uploadScript.cp({
         source: `${contentRoot}${fileName}`,
         target: fileName,

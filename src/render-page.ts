@@ -6,7 +6,7 @@ import { PageScraper } from './page-scraper'
 import { regexReplaceAll } from './content-rewrite'
 
 async function renderPage(page: Page, pageScraper?: PageScraper, scrapeDepth?: number): Promise<[number, string]> {
-  const { page: pageConfig, pathifyParams } = config
+  const { page: pageConfig } = config
 
   try {
     console.log(`[render-page] wait for selector: ${pageConfig.waitSelector}`)
@@ -33,7 +33,33 @@ async function renderPage(page: Page, pageScraper?: PageScraper, scrapeDepth?: n
     await pageScraper.scrape(page, scrapeDepth)
   }
 
-  if (pathifyParams) {
+  if (config.urlRewrite.pathifyParams) {
+    for (const [regex, replace] of config.urlRewrite.regex) {
+      console.log(`[render-page] rewriting link URLs: ${regex} -> ${replace}`)
+      // eslint-disable-next-line no-await-in-loop
+      await page.evaluate(
+        // eslint-disable-next-line no-loop-func
+        (_regex: string, _replace: string, _origins: string[]) => {
+          // eslint-disable-next-line no-undef
+          document.querySelectorAll('a').forEach((element) => {
+            const { href } = element
+            const url = new URL(href)
+            if (_origins.some((o) => o === url.origin)) {
+              const newHref = element.href.replace(new RegExp(_regex, 'g'), _replace)
+              const newUrl = new URL(newHref)
+
+              // eslint-disable-next-line no-param-reassign
+              element.href = `${newUrl.pathname}${
+                newUrl.searchParams.toString() === '' ? '' : `?${newUrl.searchParams.toString()}`
+              }`
+            }
+          })
+        },
+        regex,
+        replace,
+        config.origins
+      )
+    }
     await page.evaluate((origins: string[]) => {
       // eslint-disable-next-line no-undef
       document.querySelectorAll('a').forEach((element) => {

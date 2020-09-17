@@ -26,7 +26,7 @@ const preRender = async (): Promise<{ pagesRendered: number }> => {
 
   const { paths, scrape, scrapeDepth } = preRenderConfig
 
-  const pageScraper = new PageScraper(scrapeDepth, config.origins)
+  const pageScraper = new PageScraper(scrapeDepth, config.origins, config.preRender.exclude)
   pageScraper.seen([...(paths || ['/'])])
   pageScraper.pathsToVisit(
     (paths?.length > 0 ? paths : ['/']).map((path, index) => ({
@@ -83,11 +83,10 @@ const preRender = async (): Promise<{ pagesRendered: number }> => {
     const [status, html] = await renderPage(page, scrape ? pageScraper : undefined, scrape ? depth : undefined)
     timerHandle()
     const pathRenderMs = Date.now() - pathStart
+    const [renderedUrl] = cachePageRenderResult({ url, html, status, redirects })
     if (config.log.renderTime) {
-      console.info(`[pre-render] rendered ${url}: ${yellow(`${pathRenderMs}ms`)}`)
+      console.info(`[pre-render] rendered ${renderedUrl}: ${yellow(`${pathRenderMs}ms`)}`)
     }
-
-    cachePageRenderResult({ url, html, status, redirects })
     if (!pageConfig.navigateFunction) {
       await page.close()
       page = await createPage(browser)
