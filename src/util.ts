@@ -52,45 +52,55 @@ export const getFileName = ({
   urlString,
   pathifyParams,
   urlRewrite,
+  dirIndexIfNoExt,
   fileNameSuffix,
 }: {
   outputDir: string
   urlString: string
   pathifyParams: boolean
   urlRewrite: [string, string][]
+  dirIndexIfNoExt: boolean
   fileNameSuffix?: string
-}): string => {
+}): [string, string] => {
   let workingUrl = urlString
   for (const [regex, replace] of urlRewrite) {
     workingUrl = workingUrl.replace(new RegExp(regex, 'g'), replace)
   }
   const url = new URL(workingUrl)
-  const { pathname, searchParams } = url
-  const rawDirName = path.dirname(pathname)
-  const dirName = rawDirName.endsWith('/') ? rawDirName : `${rawDirName}/`
-  const baseName = path.basename(pathname)
-  const fileNameWithoutSearchParams = baseName === '' ? 'index' : baseName
+
+  let { pathname } = url
+  const ext = path.extname(pathname)
+
+  const { searchParams } = url
+  if (ext !== '') {
+    pathname = pathname.slice(0, -ext.length)
+  }
 
   const searchEntries = Array.from(searchParams.entries())
   const paramsPathified = paramsToPathSuffix(url)
-  let searchParamsEncoded: string
   if (paramsPathified && pathifyParams) {
-    searchParamsEncoded = paramsPathified
+    pathname = `${pathname}${paramsPathified}${ext}`
   } else if (searchEntries.length > 0) {
-    searchParamsEncoded = `-${Buffer.from(searchParams.toString()).toString('base64')}`
+    pathname = `${pathname}/${Buffer.from(searchParams.toString()).toString('base64')}${ext}`
+  } else if (ext !== '') {
+    pathname = `${pathname}${ext}`
   }
 
-  const fileName = searchParamsEncoded
-    ? `${fileNameWithoutSearchParams}${searchParamsEncoded}`
-    : fileNameWithoutSearchParams
+  let resultFileName: [string, string]
+  let fullDirName
 
-  const fullDirName = searchParamsEncoded
-    ? `${outputDir}${dirName}/${path.dirname(`${fileNameWithoutSearchParams}${searchParamsEncoded}`)}`
-    : `${outputDir}${dirName}`
+  if (dirIndexIfNoExt && ext === '') {
+    const dirName = pathname.endsWith('/') ? pathname : `${pathname}/`
+    fullDirName = `${outputDir}${dirName}`
+    resultFileName = [pathname, `${dirName}index.html`]
+  } else {
+    fullDirName = `${outputDir}${path.dirname(pathname)}`
+    resultFileName = [pathname, fileNameSuffix ? `${pathname}${fileNameSuffix}` : pathname]
+  }
   if (!fs.existsSync(fullDirName)) {
     fs.mkdirSync(fullDirName, { recursive: true })
   }
-  return `${dirName}${fileName}${fileNameSuffix || ''}`
+  return resultFileName
 }
 
 export const snooze = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))

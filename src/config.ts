@@ -57,6 +57,7 @@ export interface PreRenderConfig {
 
 export interface StaticSiteConfig {
   contentOutput?: string
+  dirIndex: boolean
   nginx?: StaticSiteNginxConfig
   s3?: StaticSiteS3Config
 }
@@ -208,6 +209,9 @@ const defaultConfig: Config = {
   urlRewrite: {
     pathifyParams: false,
     regex: [],
+  },
+  static: {
+    dirIndex: false,
   },
 }
 
@@ -412,6 +416,11 @@ export const { argv } = yargsRaw
       description: 'A list of status codes for which to configure the error page (static site)',
       demandOption: false,
     },
+    'static-dir-index': {
+      boolean: true,
+      description: 'Output pages at URLs without an extension a dir index (/path/to/page/index.html) (static site)',
+      demandOption: false,
+    },
     'origin-base-url': {
       type: 'string',
       description: 'Origin base URL (when using the default config)',
@@ -556,6 +565,7 @@ config.rewrite = {
 config.static = {
   ...(config.static || {}),
   ...{
+    dirIndex: argv['static-dir-index'] || envBoolean('STATIC_DIR_INDEX') || config.static?.dirIndex,
     nginx: {
       ...(config.static?.nginx || {}),
       ...{

@@ -82,39 +82,44 @@ export const buildS3UploadScript = ({
 
     const { status } = entry
     if (!(status >= 301 && status <= 303)) {
-      const fileName = getFileName({
+      const [pathname, fileName] = getFileName({
         outputDir: contentRoot,
         urlString: urlStr,
         pathifyParams,
         urlRewrite,
+        dirIndexIfNoExt: config.static.dirIndex,
+        fileNameSuffix: '.html',
       })
       uploadScript.cp({
-        source: `${contentRoot}${fileName}.html`,
-        target: fileName,
+        source: `${contentRoot}${fileName}`,
+        target: pathname,
         contentType: 'text/html',
         acl: 'public-read',
       })
-      uploadScript.cp({
-        source: `${contentRoot}${fileName}.html`,
-        target: `${fileName}.html`,
-        contentType: 'text/html',
-        acl: 'public-read',
-      })
+      if (!pathname.endsWith('.html')) {
+        uploadScript.cp({
+          source: `${contentRoot}${fileName}`,
+          target: `${pathname}.html`,
+          contentType: 'text/html',
+          acl: 'public-read',
+        })
+      }
     }
   }
 
   const assetEntries = cache.listAssetEntries()
   for (const [urlStr, entry] of assetEntries) {
     if (!(entry.status >= 301 && entry.status <= 303)) {
-      const fileName = getFileName({
+      const [pathname, fileName] = getFileName({
         outputDir: contentRoot,
         urlString: urlStr,
         pathifyParams,
         urlRewrite: [],
+        dirIndexIfNoExt: false,
       })
       uploadScript.cp({
         source: `${contentRoot}${fileName}`,
-        target: fileName,
+        target: pathname,
         contentType: mime.lookup(urlStr) || 'application/octet-stream',
         acl: 'public-read',
       })

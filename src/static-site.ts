@@ -50,11 +50,12 @@ const staticSite = async (): Promise<void> => {
 
     const { status } = entry
     if (!(status >= 301 && status <= 303)) {
-      const fileName = getFileName({
+      const [, fileName] = getFileName({
         outputDir: staticSiteConfig.contentOutput,
         urlString: urlStr,
         pathifyParams: config.urlRewrite.pathifyParams,
         urlRewrite: config.urlRewrite.regex,
+        dirIndexIfNoExt: config.static.dirIndex,
         fileNameSuffix: '.html',
       })
       const { content } = entry
@@ -66,11 +67,12 @@ const staticSite = async (): Promise<void> => {
   const assetEntries = cache.listAssetEntries()
   for (const [urlStr, entry] of assetEntries) {
     if (!(entry.status >= 301 && entry.status <= 303)) {
-      const fileName = getFileName({
+      const [, fileName] = getFileName({
         outputDir: staticSiteConfig.contentOutput,
         urlString: urlStr,
         pathifyParams: false,
         urlRewrite: [],
+        dirIndexIfNoExt: false,
       })
       try {
         outputFile(staticSiteConfig.contentOutput, fileName, entry.content)
