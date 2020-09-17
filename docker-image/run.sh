@@ -36,7 +36,7 @@ else
   echo "will not use greenlock"
 fi
 
-CMD="node /usr/local/lib/node_modules/spa-ssr-proxy/dist/server.js"
+CMD="node /usr/local/lib/node_modules/renderback-cli/dist/server.js"
 
 if [[ $STAGING -eq 1 ]]; then
   CMD+=" --staging"

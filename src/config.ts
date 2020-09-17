@@ -173,7 +173,8 @@ export interface RuntimeConfig {
 
 const defaultConfig: Config = {
   browserExecutable: '/usr/bin/google-chrome-stable',
-  userAgent: 'ssr/proxy',
+  userAgent:
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36 renderback/SSR',
   httpPort: 40080,
   enableCache: true,
   adminAccessKey: '',

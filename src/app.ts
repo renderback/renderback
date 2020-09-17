@@ -59,7 +59,7 @@ const logRoute = (url: string, route: Route) => {
   }
 }
 
-app.post('/__ssr/admin/clear-cache', async (req, res) => {
+app.post('/__renderback/admin/clear-cache', async (req, res) => {
   if (req.header('Authorization') === `Bearer ${adminAccessKey}`) {
     if (
       typeof adminAccessKey === 'undefined' ||

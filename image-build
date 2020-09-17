@@ -5,7 +5,7 @@
 
 CMD="docker build "
 
-for tag in $(./docker-get-tag); do
+for tag in $(./image-get-tag); do
   CMD+=" -t ${tag}"
 done
 

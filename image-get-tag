@@ -16,8 +16,8 @@ if [[ $VERSION == "SNAPSHOT" ]]; then
     VERSION="${SHA}"
   fi
 fi
-USER_NAME=yurique
-IMAGE_NAME=spa-ssr-proxy
+USER_NAME=renderback
+IMAGE_NAME=renderback
 
 IMAGE="${USER_NAME}/${IMAGE_NAME}"
 echo "${IMAGE}:$VERSION"

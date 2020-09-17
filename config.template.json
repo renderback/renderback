@@ -1,7 +1,6 @@
 {
   "browserExecutablePath": "/usr/bin/google-chrome-stable",
   "port": 8080,
-  "userAgent": "ssr/proxy",
   "cacheResponses": true,
   "prerender": true,
   "target": "https://origin-server",

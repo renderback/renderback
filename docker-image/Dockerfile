@@ -17,7 +17,7 @@ ENV HTTP_PORT 80
 ENV BROWSER_EXECUTABLE "/usr/bin/google-chrome-stable"
 COPY --chown=node:node run.sh run.sh
 
-RUN npm install -g --production spa-ssr-proxy@0.1.0
+RUN npm install -g --production renderback-cli@0.2.0
 
 USER node
-CMD ["run.sh"]
+ENTRYPOINT ["/bin/bash", "-C", "run.sh"]
