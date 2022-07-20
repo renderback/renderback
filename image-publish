@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-
-for tag in $(./image-get-tag); do
-  CMD="docker push ${tag}"
-  echo $CMD
-  $CMD
-done
