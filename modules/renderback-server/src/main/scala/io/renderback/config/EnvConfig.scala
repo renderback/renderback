@@ -27,6 +27,7 @@ final case class EnvConfig(
   browser: BrowserConfig,
   internalHost: Host, // for browserless to connect to, host.docker.internal for dev
   browserUserAgent: headers.`User-Agent`,
+  browserRetries: Int,
   bindHost: Host,
   bindPort: Port,
   cacheType: CacheType,
@@ -69,15 +70,18 @@ object EnvConfig {
                                .fromOption[F](configuration.cacheDir).map(Path(_))
                                .getOrElseF {
                                  Files[F].createTempDirectory.flatTap { path =>
-                                   logger.info(s"[!] CACHE_DIR env variable is set, using temp directory '$path'")
+                                   logger.info(s"[!] CACHE_DIR env variable is not set, using temp directory '$path'")
                                  }
                                }
     browserUserAgent      <- Sync[F].fromEither { headers.`User-Agent`.parse(browserUserAgentStr) }
+    browserRetries        <- OptionT.fromOption[F](configuration.browserRetries).getOrElseF {
+                               logger.info(s"[!] BROWSER_RETRIES env variable is not set, using default number of retries = 2").as(2)
+                             }
     redisHost             <- OptionT.fromOption[F](configuration.redisHost).getOrElseF {
-                               logger.info(s"[!] REDIS_HOST env variable is set, using default 'localhost'").as("localhost")
+                               logger.info(s"[!] REDIS_HOST env variable is not set, using default 'localhost'").as("localhost")
                              }
     redisPort             <- OptionT.fromOption[F](configuration.redisPort.flatMap(s => Try(s.toInt).toOption)).getOrElseF {
-                               logger.info(s"[!] REDIS_PORT env variable is set, using default 6379").as(6379)
+                               logger.info(s"[!] REDIS_PORT env variable is not set, using default 6379").as(6379)
                              }
     redisPassword          = configuration.redisPassword
     redisPasswordFile      = configuration.redisPasswordFile
@@ -94,6 +98,7 @@ object EnvConfig {
     browser = browserConfig,
     internalHost = internalHost,
     browserUserAgent = browserUserAgent,
+    browserRetries = browserRetries,
     bindHost = bindHost,
     bindPort = bindPort,
     cacheType = configuration.cacheType.getOrElse(CacheType.Mem),

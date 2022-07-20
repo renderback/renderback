@@ -22,7 +22,6 @@ object CachedBrowser {
   def apply[F[_]: Async](
     options: BrowserConfig,
     renderbackConfig: RenderbackConfig,
-    retries: Int = 1
   )(implicit logger: Logger[F]): Resource[F, CachedBrowser[F]] = {
 
     def logError(err: Throwable, details: RetryDetails): F[Unit] = {
@@ -46,7 +45,7 @@ object CachedBrowser {
             val cachedBrowser = new CachedBrowser[F] {
               def use[A](body: Browser[F] => F[A]): F[A] = {
                 retryingOnAllErrors(
-                  policy = RetryPolicies.limitRetries[F](retries),
+                  policy = RetryPolicies.limitRetries[F](renderbackConfig.browserRetries),
                   onError = logError
                 ) {
                   semaphore.permit.use { _ =>

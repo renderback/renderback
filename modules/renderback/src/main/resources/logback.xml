@@ -8,10 +8,9 @@
         </encoder>
     </appender>
 
-    <logger name="com.typesafe" level="WARN"/>
-    <logger name="io.renderback" level="DEBUG"/>
+    <logger name="io.renderback" level="${LOG_LEVEL_RENDERBACK:-INFO}"/>
 
-    <root level="INFO">
+    <root level="${LOG_LEVEL_ROOT:-INFO}">
         <appender-ref ref="STDOUT"/>
     </root>
 </configuration>

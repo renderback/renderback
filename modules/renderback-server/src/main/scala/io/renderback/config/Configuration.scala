@@ -12,6 +12,7 @@ case class Configuration(
   browserConnectTimeout: Option[String],
   internalHostName: Option[String],
   browserUserAgent: Option[String],
+  browserRetries: Option[Int],
   bindHost: Option[Host],
   bindPort: Option[Port],
   cacheType: Option[CacheType],

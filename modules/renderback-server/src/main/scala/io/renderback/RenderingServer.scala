@@ -31,7 +31,7 @@ object RenderingServer {
       host            <- Resource.eval { F.pure(s.host.getOrElse(envConfig.bindHost)).flatTap(h => logger.info(s"bind host: $h")) }
       port            <- Resource.eval { F.pure(s.port.getOrElse(envConfig.bindPort)).flatTap(p => logger.info(s"bind port: $p")) }
       bindConfig       = BindConfig(host, port)
-      renderbackConfig = RenderbackConfig(envConfig.browserUserAgent)
+      renderbackConfig = RenderbackConfig(envConfig.browserUserAgent, envConfig.browserRetries)
       browser         <- CachedBrowser[F](envConfig.browser, renderbackConfig)
       renderPage       = RenderPage[F]
       cacheConfig      = envConfig.cacheType match {

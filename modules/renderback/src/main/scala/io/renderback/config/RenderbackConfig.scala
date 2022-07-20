@@ -5,6 +5,7 @@ import org.http4s.headers
 
 case class RenderbackConfig(
   browserUserAgent: headers.`User-Agent`,
+  browserRetries: Int,
 ) {
 
   def isSelfRequest[F[_]](request: Request[F]): Boolean =
