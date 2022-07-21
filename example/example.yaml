@@ -1,0 +1,19 @@
+---
+host: localhost
+routes:
+  - type: Page
+    matcher:
+      noExt: true
+    source: "/opt/renderback/content/index.html"
+  - type: Asset
+    dir: "/opt/renderback/content"
+    exclude:
+      - "\\.git"
+render:
+  abortResourceRequests: true
+  allowXHR: true
+preRender:
+  paths:
+    - "/"
+  depth: 2
+
