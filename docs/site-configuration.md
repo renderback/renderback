@@ -23,14 +23,15 @@ browserUrl: "..."
 
 ### Routes
 
-A site has a set of routes. They are tried sequentially, in order they are defined in the configuration.
+A site has a set of routes. They are tried sequentially, in the order they are defined in the configuration. 
+The first one that matches is served. 
 
 The following types of routes are supported:
 
-* `Asset` - static content, served from files in the app distribution dir
+* `Asset` - static content, served from the files in the app distribution dir
 * `AssetProxy` - static content, served by proxying from another HTTP (vs serving from the app distribution dir) 
-* `Page` - the application page (html): rendered in the headless browser 
-* `PageProxy` - same as `Page`, but the page source (initial HTML) is requested from another HTTP server 
+* `Page` - an application page (html): rendered in the headless browser 
+* `PageProxy` - same as `Page`, but the page source (initial html) is requested from another HTTP server 
 * `Static` - static content (specified directly in the configuration)
 * `Proxy` - the requests will be proxied to another HTTP server (including the request method, headers, body, etc)
 
