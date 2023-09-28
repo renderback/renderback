@@ -32,7 +32,7 @@ case class RenderResultMetaData(
   contentFileBr: Option[Path] = None,
 )
 
-class RenderCache[F[_]: Files](cache: SimpleCache[F], cacheDir: Path)(implicit F: Async[F], logger: Logger[F]) {
+class RenderCache[F[_]: Files: Compression](cache: SimpleCache[F], cacheDir: Path)(implicit F: Async[F], logger: Logger[F]) {
 
   private def _key(siteConfig: SiteConfig[F], uri: Uri): Seq[String] = {
     Seq(
@@ -132,7 +132,7 @@ trait SimpleCache[F[_]] {
 
 object RenderCache {
 
-  def fromConfig[F[_]: Files](
+  def fromConfig[F[_]: Files: Compression](
     config: CacheConfig,
   )(implicit F: Async[F]): Resource[F, RenderCache[F]] = {
     val cache: Resource[F, SimpleCache[F]] = config match {

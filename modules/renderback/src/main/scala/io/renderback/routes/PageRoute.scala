@@ -5,6 +5,7 @@ import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import fs2.io.file
+import fs2.io.file.Files
 import io.renderback.config.SiteConfig
 import io.renderback.config.RouteRule
 import org.http4s.HttpRoutes
@@ -18,7 +19,7 @@ trait PageRoute[F[_]] {
 
 object PageRoute {
 
-  def apply[F[_]](
+  def apply[F[_]: Files](
     renderQueue: RenderQueue[F],
   )(implicit F: Async[F], logger: Logger[F]): PageRoute[F] = { (siteConfig: SiteConfig[F], rule: RouteRule.Page) =>
     renderQueue(siteConfig) { request =>

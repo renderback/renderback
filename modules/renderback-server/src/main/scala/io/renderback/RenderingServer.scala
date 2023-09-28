@@ -3,7 +3,10 @@ package io.renderback
 import cats.effect._
 import cats.syntax.all._
 import cats.effect.syntax.all._
+import fs2.compression.Compression
+import fs2.io.file.Files
 import fs2.io.file.Path
+import fs2.io.net.Network
 import io.lemonlabs.uri.Url
 import io.renderback.config.BindConfig
 import io.renderback.config.CacheConfig
@@ -24,7 +27,7 @@ import org.typelevel.log4cats.Logger
 
 object RenderingServer {
 
-  def start[F[_]](s: StartServerCommand)(implicit F: Async[F], logger: Logger[F]): Resource[F, Unit] = {
+  def start[F[_]: Files: Compression: Network](s: StartServerCommand)(implicit F: Async[F], logger: Logger[F]): Resource[F, Unit] = {
     for {
       envConfig       <- Resource.eval { EnvConfig.readEnv[F] }
       siteConfig      <- DecodeConfig[F, ParsedSiteConfig](Path(s.configPath))

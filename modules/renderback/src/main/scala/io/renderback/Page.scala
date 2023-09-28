@@ -99,17 +99,16 @@ class Page[F[_]](page: playwright.Page)(implicit F: Async[F], logger: Logger[F])
   )
 
   def waitForNavigation(
+    url: String,
     timeout: Option[FiniteDuration] = none,
     waitUntil: Option[WaitUntilState] = none,
-  ): F[playwright.Response] = {
+  ): F[Unit] = {
     fromBlocking(
-      page.waitForNavigation(
-        new playwright.Page.WaitForNavigationOptions()
+      page.waitForURL(
+        url,
+        new playwright.Page.WaitForURLOptions()
           .tap(a => waitUntil.foreach(a.setWaitUntil))
           .tap(a => timeout.map(_.toMillis.toDouble).foreach(a.setTimeout)),
-        () => {
-          //
-        }
       )
     )
   }

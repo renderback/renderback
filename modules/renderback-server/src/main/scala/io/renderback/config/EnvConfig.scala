@@ -73,7 +73,7 @@ object EnvConfig {
                                    logger.info(s"[!] CACHE_DIR env variable is not set, using temp directory '$path'")
                                  }
                                }
-    browserUserAgent      <- Sync[F].fromEither { headers.`User-Agent`.parse(browserUserAgentStr) }
+    browserUserAgent      <- Sync[F].fromEither { headers.`User-Agent`.parse(5)(browserUserAgentStr) }
     browserRetries        <- OptionT.fromOption[F](configuration.browserRetries).getOrElseF {
                                logger.info(s"[!] BROWSER_RETRIES env variable is not set, using default number of retries = 2").as(2)
                              }

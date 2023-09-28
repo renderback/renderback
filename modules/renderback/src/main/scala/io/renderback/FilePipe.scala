@@ -8,7 +8,7 @@ import fs2.io.file.Path
 
 object FilePipe {
 
-  def apply[F[_]](
+  def apply[F[_]: Files](
     in: Path,
     out: Path,
     pipeThrough: Pipe[F, Byte, Byte]

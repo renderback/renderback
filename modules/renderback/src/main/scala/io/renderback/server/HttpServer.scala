@@ -1,11 +1,12 @@
 package io.renderback.server
 
-import cats.Monad
 import cats.data.Kleisli
 import cats.data.OptionT
 import cats.effect.Async
 import cats.effect.Resource
 import cats.syntax.all._
+import fs2.io.file.Files
+import fs2.io.net.Network
 import org.http4s.HttpApp
 import org.http4s.HttpRoutes
 import org.http4s.Request
@@ -35,7 +36,7 @@ import scala.concurrent.duration._
 import scala.annotation.unused
 import scala.util.control.NonFatal
 
-class HttpServer[F[_]: Async](
+class HttpServer[F[_]: Async: Files: Network](
   bindConfig: BindConfig,
   hosts: () => F[Seq[SiteConfig[F]]],
   pageRoute: PageRoute[F],
@@ -150,7 +151,7 @@ class HttpServer[F[_]: Async](
 
 object HttpServer {
 
-  def apply[F[_]](
+  def apply[F[_]: Files: Network](
     bindConfig: BindConfig,
     renderbackConfig: RenderbackConfig,
     renderPage: RenderPage[F],
